@@ -14,8 +14,8 @@ let inFlight = false;
 let pendingPayload = null;
 
 // Returns:
-//   { tasks, staffing }  when the API is reachable (arrays may be empty)
-//   null                 when there is no API (local dev / offline)
+//   { tasks, staffing, lanes }  when the API is reachable (arrays may be empty)
+//   null                        when there is no API (local dev / offline)
 export async function fetchRemoteRoadmap() {
   if (typeof fetch === "undefined") return null;
   try {
@@ -25,7 +25,8 @@ export async function fetchRemoteRoadmap() {
     if (!data || typeof data !== "object") return null;
     return {
       tasks: Array.isArray(data.tasks) ? data.tasks : [],
-      staffing: Array.isArray(data.staffing) ? data.staffing : []
+      staffing: Array.isArray(data.staffing) ? data.staffing : [],
+      lanes: Array.isArray(data.lanes) ? data.lanes : []
     };
   } catch {
     return null;

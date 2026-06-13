@@ -4,7 +4,7 @@ import logoWhite from "../design/dos-flag-seal-logo-horizontal-color-whitetext.p
 
 const NAV_ITEMS = [
   { to: "/", label: "Roadmap", end: true },
-  { to: "/tasks", label: "Tasks" },
+  { to: "/tasks", label: "Work Items" },
   { to: "/staffing", label: "Staffing" },
   { to: "/executive", label: "Executive" }
 ];

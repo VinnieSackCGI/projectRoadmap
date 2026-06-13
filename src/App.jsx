@@ -6,27 +6,33 @@ import React, {
   useRef,
   useState
 } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Rnd } from "react-rnd";
 import AppHeader from "./AppHeader";
 import TaskEditorModal from "./TaskEditorModal";
 import {
   bureauStyles,
-  lanes,
   quarters,
+  TASK_STATUSES,
   TIMELINE_START_DATE,
   TIMELINE_END_DATE,
   years
 } from "./data";
 import {
+  assessStaffBurnout,
   assessTaskRisk,
   createTask as storeCreateTask,
   deleteTask as storeDeleteTask,
+  getLanes,
+  getOpenFlags,
   resolveTaskOwners,
   updateTask as storeUpdateTask,
+  useLanes,
   useStaffing,
   useTasks
 } from "./taskStore";
+import TaskFlags from "./TaskFlags";
+import LaneManagerModal from "./LaneManagerModal";
 import {
   createEmptyWorkItemDraft,
   formatDateLabel,
@@ -55,6 +61,19 @@ const HUB_VIEWBOX_HEIGHT = 840;
 const HUB_CENTER_X = HUB_VIEWBOX_WIDTH / 2;
 const HUB_CENTER_Y = HUB_VIEWBOX_HEIGHT / 2;
 const HUB_POSITION_STORAGE_KEY = "project-roadmap-hub-positions-v1";
+const ZOOM_STORAGE_KEY = "project-roadmap-zoom-v1";
+const COLLAPSED_LANES_STORAGE_KEY = "project-roadmap-collapsed-lanes-v1";
+const LANE_LABEL_WIDTH = 220;
+
+// Timeline zoom levels. "Fit" keeps the whole FY26–FY28 window in view; the
+// others widen each fiscal quarter to a fixed pixel width so the shell scrolls
+// horizontally and bars become large enough to read and reschedule precisely.
+const ZOOM_LEVELS = [
+  { key: "fit", label: "Fit", quarterPx: null },
+  { key: "year", label: "Year", quarterPx: 150 },
+  { key: "quarter", label: "Quarter", quarterPx: 280 },
+  { key: "month", label: "Month", quarterPx: 460 }
+];
 
 const FALLBACK_TIMELINE_START = new Date(Date.UTC(2025, 9, 1));
 const FALLBACK_TIMELINE_END = new Date(Date.UTC(2028, 8, 30));
@@ -213,7 +232,7 @@ function stackIntervals(items, getStart, getEnd) {
 
 function createEmptyDraft() {
   return createEmptyWorkItemDraft({
-    lane: lanes[0].key,
+    lane: getLanes()[0]?.key,
     bureau: Object.keys(bureauStyles)[0],
     fallbackDate: toIsoDate(new Date())
   });
@@ -223,9 +242,11 @@ function LaneTrack({
   lane,
   laneIndex,
   tasks,
-  filter,
+  matchFilters,
   activeTaskId,
   todayPosition,
+  collapsed,
+  onToggleCollapse,
   onTaskHover,
   onTaskMove,
   onTaskClick,
@@ -255,12 +276,10 @@ function LaneTrack({
     };
   }, []);
 
-  const laneTasks = useMemo(() => {
-    const scoped = tasks.filter((task) => task.lane === lane.key);
-    return filter.length === 0
-      ? scoped
-      : scoped.filter((task) => filter.includes(task.bureau));
-  }, [tasks, filter, lane.key]);
+  const laneTasks = useMemo(
+    () => tasks.filter((task) => task.lane === lane.key && matchFilters(task)),
+    [tasks, matchFilters, lane.key]
+  );
 
   const laneLayout = useMemo(
     () =>
@@ -273,23 +292,40 @@ function LaneTrack({
   );
 
   const unitWidth = trackWidth > 0 ? trackWidth / TIMELINE_LENGTH : DEFAULT_TIMELINE_UNIT_WIDTH;
-  const laneHeight = Math.max(
-    148,
-    TASK_TOP_PADDING + laneLayout.rows.length * TASK_ROW_HEIGHT + TASK_BOTTOM_PADDING
-  );
+  const laneHeight = collapsed
+    ? 52
+    : Math.max(
+        148,
+        TASK_TOP_PADDING + laneLayout.rows.length * TASK_ROW_HEIGHT + TASK_BOTTOM_PADDING
+      );
 
   return (
     <>
       <div
-        className={`lane-name ${laneIndex % 2 === 1 ? "alt" : ""}`}
+        className={`lane-name ${laneIndex % 2 === 1 ? "alt" : ""} ${collapsed ? "is-collapsed" : ""}`}
         style={{ minHeight: `${laneHeight}px` }}
       >
-        <div className="lane-title">{lane.key}</div>
-        <div className="lane-caption">{lane.caption}</div>
+        <button
+          type="button"
+          className="lane-collapse-btn"
+          onClick={() => onToggleCollapse(lane.key)}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? `Expand ${lane.key}` : `Collapse ${lane.key}`}
+        >
+          {collapsed ? "▸" : "▾"}
+        </button>
+        <div className="lane-name-text">
+          <div className="lane-title">{lane.key}</div>
+          {collapsed ? (
+            <div className="lane-caption">{laneTasks.length} item{laneTasks.length === 1 ? "" : "s"}</div>
+          ) : (
+            <div className="lane-caption">{lane.caption}</div>
+          )}
+        </div>
       </div>
 
       <div
-        className={`lane-track ${laneIndex % 2 === 1 ? "alt" : ""}`}
+        className={`lane-track ${laneIndex % 2 === 1 ? "alt" : ""} ${collapsed ? "is-collapsed" : ""}`}
         ref={trackRef}
         style={{ minHeight: `${laneHeight}px` }}
       >
@@ -300,10 +336,13 @@ function LaneTrack({
             aria-hidden="true"
           />
         ) : null}
-        {laneLayout.assignments.map(({ item: task, rowIndex, start, end }) => {
+        {collapsed
+          ? null
+          : laneLayout.assignments.map(({ item: task, rowIndex, start, end }) => {
           const width = Math.max(20, (end - start) * unitWidth - BAR_TOTAL_INSET);
           const x = start * unitWidth + BAR_HORIZONTAL_INSET;
           const y = TASK_TOP_PADDING + rowIndex * TASK_ROW_HEIGHT;
+          const openFlagCount = getOpenFlags(task).length;
 
           return (
             <Rnd
@@ -332,11 +371,12 @@ function LaneTrack({
                 type="button"
                 className={`task-bar ${isLowConfidence(task.confidence) ? "confidence-low" : ""} ${
                   activeTaskId === task.id ? "active" : ""
-                } status-${(task.status || "planned").toLowerCase().replace(/\s+/g, "-")}`}
+                } ${openFlagCount > 0 ? "is-flagged" : ""} status-${(task.status || "planned").toLowerCase().replace(/\s+/g, "-")}`}
                 style={{
                   background: `linear-gradient(135deg, ${bureauColor(task.bureau)}, rgba(20, 26, 35, 0.86))`,
                   "--bureau-accent": bureauColor(task.bureau)
                 }}
+                title={`${task.task} · ${formatDateLabel(task.startDate)} – ${formatDateLabel(task.endDate)}`}
                 onMouseEnter={(event) => onTaskHover(task, event, event.currentTarget)}
                 onMouseMove={(event) => onTaskMove(task, event)}
                 onFocus={(event) => onTaskHover(task, null, event.currentTarget)}
@@ -346,6 +386,11 @@ function LaneTrack({
                 }}
               >
                 <span className="task-bar-accent" aria-hidden="true" />
+                {openFlagCount > 0 ? (
+                  <span className="task-flag-badge" title={`${openFlagCount} open flag${openFlagCount === 1 ? "" : "s"}`}>
+                    ⚑ {openFlagCount}
+                  </span>
+                ) : null}
                 <span className="task-title">{task.task}</span>
                 <span className="task-meta">
                   <span>{task.bureau}</span>
@@ -364,6 +409,7 @@ function AssignmentHub({
   graph,
   selectedTaskId,
   selectedEmployeeId,
+  burnoutByName = {},
   onMoveNode,
   onSelectEmployee,
   onSelectTask
@@ -498,6 +544,11 @@ function AssignmentHub({
         <span>{graph.employees.length} employees</span>
         <span>{graph.projects.length} assigned work items</span>
         <span>{graph.connections.length} assignment links</span>
+        <span className="hub-capacity-legend">
+          <span className="legend-dot tone-healthy" /> Healthy
+          <span className="legend-dot tone-stretched" /> Stretched
+          <span className="legend-dot tone-overloaded" /> Overloaded
+        </span>
       </div>
 
       <div className="assignment-hub-surface" ref={surfaceRef}>
@@ -562,13 +613,14 @@ function AssignmentHub({
           const isActive = hasProjectSelection
             ? selectedEmployeeIds.has(employee.id)
             : isSelected;
+          const burnoutLevel = burnoutByName[employee.person] || "Healthy";
           return (
             <button
               key={employee.id}
               type="button"
-              className={`hub-node employee-node ${isDimmed ? "is-dim" : ""} ${isActive ? "is-active" : ""}`}
+              className={`hub-node employee-node burnout-${burnoutLevel.toLowerCase()} ${isDimmed ? "is-dim" : ""} ${isActive ? "is-active" : ""}`}
               style={{ left: `${employee.left}%`, top: `${employee.top}%` }}
-              title={employee.person}
+              title={`${employee.person} — ${burnoutLevel}`}
               onPointerDown={(event) => handleNodePointerDown(event, { ...employee, type: "employee" })}
               onPointerMove={handleNodePointerMove}
               onPointerUp={handleNodePointerEnd}
@@ -652,16 +704,159 @@ function AssignmentHub({
 export default function App() {
   const tasks = useTasks();
   const staffing = useStaffing();
-  const navigate = useNavigate();
-  const handleTaskClick = useCallback(
-    (task) => navigate(`/tasks/${task.id}`),
-    [navigate]
-  );
+  const lanes = useLanes();
+  const [laneManagerOpen, setLaneManagerOpen] = useState(false);
   const [filter, setFilter] = useState([]);
+  const [statusFilter, setStatusFilter] = useState([]);
+  const [flaggedOnly, setFlaggedOnly] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState(null);
+  const [pinnedTaskId, setPinnedTaskId] = useState(null);
+  const [zoomKey, setZoomKey] = useState(() => {
+    if (typeof window === "undefined") return "fit";
+    const saved = window.localStorage.getItem(ZOOM_STORAGE_KEY);
+    return ZOOM_LEVELS.some((level) => level.key === saved) ? saved : "fit";
+  });
+  const [collapsedLanes, setCollapsedLanes] = useState(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const raw = window.localStorage.getItem(COLLAPSED_LANES_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      return new Set();
+    }
+  });
+  const [undo, setUndo] = useState(null);
   const [selectedHubTaskId, setSelectedHubTaskId] = useState(null);
   const [selectedHubEmployeeId, setSelectedHubEmployeeId] = useState(null);
   const [hubPositionOverrides, setHubPositionOverrides] = useState(() => readHubPositionOverrides());
+
+  const undoTimerRef = useRef(null);
+
+  // Clicking a bar pins it so the detail card stays put (and stops following the
+  // cursor); hovering only previews. Esc or the card's Close button clears it.
+  const handleTaskClick = useCallback((task) => {
+    setPinnedTaskId(task.id);
+    setActiveTaskId(task.id);
+    // Park the card instead of letting it chase the cursor while pinned.
+    hoverPointRef.current = null;
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setPinnedTaskId(null);
+    setActiveTaskId(null);
+    hoverPointRef.current = null;
+  }, []);
+
+  const showUndo = useCallback((taskId, label, prev) => {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+    }
+    setUndo({ taskId, label, prev });
+    undoTimerRef.current = setTimeout(() => setUndo(null), 7000);
+  }, []);
+
+  const applyUndo = useCallback(() => {
+    if (!undo) return;
+    storeUpdateTask(undo.taskId, undo.prev);
+    setUndo(null);
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+    }
+  }, [undo]);
+
+  const zoom = useMemo(
+    () => ZOOM_LEVELS.find((level) => level.key === zoomKey) || ZOOM_LEVELS[0],
+    [zoomKey]
+  );
+
+  const timelineGridStyle = useMemo(() => {
+    if (!zoom.quarterPx) {
+      return {
+        gridTemplateColumns: `${LANE_LABEL_WIDTH}px repeat(12, minmax(84px, 1fr))`,
+        minWidth: `${LANE_LABEL_WIDTH + 12 * 84}px`
+      };
+    }
+    return {
+      gridTemplateColumns: `${LANE_LABEL_WIDTH}px repeat(12, ${zoom.quarterPx}px)`,
+      minWidth: `${LANE_LABEL_WIDTH + 12 * zoom.quarterPx}px`
+    };
+  }, [zoom]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(ZOOM_STORAGE_KEY, zoomKey);
+    }
+  }, [zoomKey]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        COLLAPSED_LANES_STORAGE_KEY,
+        JSON.stringify([...collapsedLanes])
+      );
+    }
+  }, [collapsedLanes]);
+
+  const toggleLaneCollapsed = useCallback((key) => {
+    setCollapsedLanes((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
+  const collapseAllLanes = useCallback(() => {
+    setCollapsedLanes(new Set(lanes.map((lane) => lane.key)));
+  }, [lanes]);
+
+  const expandAllLanes = useCallback(() => {
+    setCollapsedLanes(new Set());
+  }, []);
+
+  const matchFilters = useCallback(
+    (task) => {
+      if (filter.length && !filter.includes(task.bureau)) return false;
+      if (statusFilter.length && !statusFilter.includes(task.status || "Planned")) return false;
+      if (flaggedOnly && getOpenFlags(task).length === 0) return false;
+      return true;
+    },
+    [filter, statusFilter, flaggedOnly]
+  );
+
+  const toggleStatusFilter = useCallback((value) => {
+    setStatusFilter((current) =>
+      current.includes(value)
+        ? current.filter((entry) => entry !== value)
+        : [...current, value]
+    );
+  }, []);
+
+  const shiftTask = useCallback((task, deltaDays) => {
+    const start = parseIsoDate(task.startDate);
+    const end = parseIsoDate(task.endDate);
+    if (!start || !end) return;
+    const duration = end.getTime() - start.getTime();
+    const minMs = timelineStartDate.getTime();
+    const maxMs = timelineEndDate.getTime();
+    let startMs = start.getTime() + deltaDays * MS_PER_DAY;
+    if (startMs < minMs) startMs = minMs;
+    let endMs = startMs + duration;
+    if (endMs > maxMs) {
+      endMs = maxMs;
+      startMs = Math.max(minMs, endMs - duration);
+    }
+    const nextStart = toIsoDate(new Date(startMs));
+    const nextEnd = toIsoDate(new Date(endMs));
+    if (nextStart === task.startDate && nextEnd === task.endDate) return;
+    const prev = { startDate: task.startDate, endDate: task.endDate };
+    storeUpdateTask(task.id, { startDate: nextStart, endDate: nextEnd });
+    showUndo(task.id, `Shifted "${task.task}"`, prev);
+  }, [showUndo]);
 
   const shellRef = useRef(null);
   const hoverDetailsRef = useRef(null);
@@ -692,6 +887,8 @@ export default function App() {
 
   const clearFilter = useCallback(() => {
     setFilter([]);
+    setStatusFilter([]);
+    setFlaggedOnly(false);
   }, []);
 
   const bureauOptions = useMemo(
@@ -736,9 +933,8 @@ export default function App() {
   });
 
   const visibleTasks = useMemo(
-    () =>
-      filter.length === 0 ? tasks : tasks.filter((task) => filter.includes(task.bureau)),
-    [tasks, filter]
+    () => tasks.filter(matchFilters),
+    [tasks, matchFilters]
   );
 
   const assignmentHub = useMemo(() => {
@@ -840,7 +1036,12 @@ export default function App() {
     );
 
     return { employees, projects, connections, laneLabels };
-  }, [hubPositionOverrides, staffing, visibleTasks]);
+  }, [hubPositionOverrides, lanes, staffing, visibleTasks]);
+
+  const burnoutByName = useMemo(() => {
+    const list = assessStaffBurnout(staffing, tasks);
+    return Object.fromEntries(list.map((entry) => [entry.person, entry.level]));
+  }, [staffing, tasks]);
 
   const todayPosition = useMemo(() => todayFloatPosition(), []);
 
@@ -894,11 +1095,28 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (activeTask && filter.length > 0 && !filter.includes(activeTask.bureau)) {
+    if (activeTask && !matchFilters(activeTask)) {
       setActiveTaskId(null);
+      setPinnedTaskId(null);
       hoverPointRef.current = null;
     }
-  }, [activeTask, filter]);
+  }, [activeTask, matchFilters]);
+
+  useEffect(() => {
+    const handleKey = (event) => {
+      if (event.key === "Escape") {
+        clearSelection();
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [clearSelection]);
+
+  useEffect(() => () => {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+    }
+  }, []);
 
   const positionHoverDetails = useCallback(() => {
     const panel = hoverDetailsRef.current;
@@ -984,13 +1202,13 @@ export default function App() {
 
   const handleTaskMove = useCallback(
     (task, event) => {
-      if (activeTaskId !== task.id) {
+      if (activeTaskId !== task.id || pinnedTaskId) {
         return;
       }
       setHoverPointFromEvent(event);
       positionHoverDetails();
     },
-    [activeTaskId, positionHoverDetails, setHoverPointFromEvent]
+    [activeTaskId, pinnedTaskId, positionHoverDetails, setHoverPointFromEvent]
   );
 
   const handleTaskDragStop = useCallback((task, x, unitWidth) => {
@@ -998,6 +1216,7 @@ export default function App() {
       return;
     }
 
+    const prev = { startDate: task.startDate, endDate: task.endDate };
     const currentStart = taskStartFloat(task);
     const currentEnd = taskEndFloat(task);
     const duration = currentEnd - currentStart;
@@ -1006,18 +1225,23 @@ export default function App() {
     newStart = clamp(newStart, 0, TIMELINE_LENGTH - duration);
     const newEnd = newStart + duration;
 
-    storeUpdateTask(task.id, {
-      startDate: dateFromTimelinePosition(newStart),
-      endDate: dateFromTimelinePosition(newEnd - 1)
-    });
+    const nextStart = dateFromTimelinePosition(newStart);
+    const nextEnd = dateFromTimelinePosition(newEnd - 1);
+    if (nextStart === prev.startDate && nextEnd === prev.endDate) {
+      return;
+    }
+
+    storeUpdateTask(task.id, { startDate: nextStart, endDate: nextEnd });
     setActiveTaskId(task.id);
-  }, []);
+    showUndo(task.id, `Rescheduled "${task.task}"`, prev);
+  }, [showUndo]);
 
   const handleTaskResizeStop = useCallback((task, x, width, unitWidth) => {
     if (!unitWidth) {
       return;
     }
 
+    const prev = { startDate: task.startDate, endDate: task.endDate };
     let newStart = snapToStep((x - BAR_HORIZONTAL_INSET) / unitWidth);
     let duration = snapToStep((width + BAR_TOTAL_INSET) / unitWidth);
 
@@ -1030,12 +1254,16 @@ export default function App() {
       newStart = Math.max(0, newEnd - duration);
     }
 
-    storeUpdateTask(task.id, {
-      startDate: dateFromTimelinePosition(newStart),
-      endDate: dateFromTimelinePosition(newEnd - 1)
-    });
+    const nextStart = dateFromTimelinePosition(newStart);
+    const nextEnd = dateFromTimelinePosition(newEnd - 1);
+    if (nextStart === prev.startDate && nextEnd === prev.endDate) {
+      return;
+    }
+
+    storeUpdateTask(task.id, { startDate: nextStart, endDate: nextEnd });
     setActiveTaskId(task.id);
-  }, []);
+    showUndo(task.id, `Resized "${task.task}"`, prev);
+  }, [showUndo]);
 
   const timelineStyle = {
     "--roadmap-bg-image": `url(${backgroundImage})`
@@ -1079,30 +1307,62 @@ export default function App() {
 
         <section className="toolbar">
           <div className="controls card">
-            <div className="legend-bar">
-              <button
-                type="button"
-                className={`legend-chip filter ${filter.length === 0 ? "active" : ""}`}
-                onClick={clearFilter}
-                aria-pressed={filter.length === 0}
-              >
-                <span className="swatch swatch-all" />
-                All
-              </button>
-              {filterOptions
-                .filter((value) => value !== "All")
-                .map((value) => (
+            <div className="filter-group">
+              <span className="filter-group-label">Bureau</span>
+              <div className="legend-bar">
+                <button
+                  type="button"
+                  className={`legend-chip filter ${filter.length === 0 ? "active" : ""}`}
+                  onClick={() => setFilter([])}
+                  aria-pressed={filter.length === 0}
+                >
+                  <span className="swatch swatch-all" />
+                  All
+                </button>
+                {filterOptions
+                  .filter((value) => value !== "All")
+                  .map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`legend-chip filter ${filter.includes(value) ? "active" : ""}`}
+                      onClick={() => toggleFilter(value)}
+                      aria-pressed={filter.includes(value)}
+                    >
+                      <span className="swatch" style={{ background: bureauColor(value) }} />
+                      {bureauStyles[value]?.label || value}
+                    </button>
+                  ))}
+              </div>
+            </div>
+            <div className="filter-group">
+              <span className="filter-group-label">Status</span>
+              <div className="legend-bar">
+                {TASK_STATUSES.map((value) => (
                   <button
                     key={value}
                     type="button"
-                    className={`legend-chip filter ${filter.includes(value) ? "active" : ""}`}
-                    onClick={() => toggleFilter(value)}
-                    aria-pressed={filter.includes(value)}
+                    className={`legend-chip filter ${statusFilter.includes(value) ? "active" : ""}`}
+                    onClick={() => toggleStatusFilter(value)}
+                    aria-pressed={statusFilter.includes(value)}
                   >
-                    <span className="swatch" style={{ background: bureauColor(value) }} />
-                    {bureauStyles[value]?.label || value}
+                    {value}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  className={`legend-chip filter ${flaggedOnly ? "active" : ""}`}
+                  onClick={() => setFlaggedOnly((value) => !value)}
+                  aria-pressed={flaggedOnly}
+                >
+                  ⚑ Flagged only
+                </button>
+                {(filter.length || statusFilter.length || flaggedOnly) ? (
+                  <button type="button" className="secondary-btn filter-reset" onClick={clearFilter}>
+                    Reset filters
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
         </section>
@@ -1113,21 +1373,51 @@ export default function App() {
               <div className="section-title">Timeline</div>
               <h2>Roadmap</h2>
             </div>
-            <button type="button" className="primary-btn" onClick={openCreateEditor}>
-              Add Work Item
-            </button>
+            <div className="roadmap-header-actions">
+              <div className="zoom-controls" role="group" aria-label="Timeline zoom">
+                <span className="zoom-label">Zoom</span>
+                {ZOOM_LEVELS.map((level) => (
+                  <button
+                    key={level.key}
+                    type="button"
+                    className={`zoom-btn ${zoomKey === level.key ? "active" : ""}`}
+                    onClick={() => setZoomKey(level.key)}
+                    aria-pressed={zoomKey === level.key}
+                  >
+                    {level.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={collapsedLanes.size >= lanes.length ? expandAllLanes : collapseAllLanes}
+              >
+                {collapsedLanes.size >= lanes.length ? "Expand all" : "Collapse all"}
+              </button>
+              <button type="button" className="secondary-btn" onClick={() => setLaneManagerOpen(true)}>
+                Manage lanes
+              </button>
+              <button type="button" className="primary-btn" onClick={openCreateEditor}>
+                Add Work Item
+              </button>
+            </div>
           </div>
           <div className="roadmap-layout">
             <div
               className="timeline-shell"
               ref={shellRef}
               onMouseLeave={() => {
-                setActiveTaskId(null);
-                hoverPointRef.current = null;
+                if (pinnedTaskId) {
+                  setActiveTaskId(pinnedTaskId);
+                } else {
+                  setActiveTaskId(null);
+                  hoverPointRef.current = null;
+                }
               }}
               onScroll={positionHoverDetails}
             >
-              <div className="timeline-grid">
+              <div className="timeline-grid" style={timelineGridStyle}>
                 <div className="corner">Solution type</div>
                 {years.map((year) => (
                   <div
@@ -1161,9 +1451,11 @@ export default function App() {
                     lane={lane}
                     laneIndex={laneIndex}
                     tasks={tasks}
-                    filter={filter}
+                    matchFilters={matchFilters}
                     activeTaskId={activeTaskId}
                     todayPosition={todayPosition}
+                    collapsed={collapsedLanes.has(lane.key)}
+                    onToggleCollapse={toggleLaneCollapsed}
                     onTaskHover={handleTaskHover}
                     onTaskMove={handleTaskMove}
                     onTaskClick={handleTaskClick}
@@ -1180,16 +1472,30 @@ export default function App() {
                 {!activeTask ? (
                   <>
                     <div className="section-title">Work Item Details</div>
-                    <h2>Hover a roadmap bar</h2>
+                    <h2>Select a roadmap bar</h2>
                     <p className="note">
-                      Move your pointer over any task to preview timing, staffing signal,
-                      and source. Click Add Work Item to add work, and use Edit Task to update
-                      selected entries.
+                      Hover any bar to preview timing, staffing, and risk. Click a bar to pin
+                      these details, flag it, or open the full record. Drag or resize a bar to
+                      reschedule — you can undo the change right after.
                     </p>
                   </>
                 ) : (
                   <>
-                    <div className="section-title">Work Item Details</div>
+                    <div className="hover-details-head">
+                      <div className="section-title">
+                        Work Item Details{pinnedTaskId === activeTask.id ? " · Pinned" : ""}
+                      </div>
+                      {pinnedTaskId === activeTask.id ? (
+                        <button
+                          type="button"
+                          className="hover-close-btn"
+                          onClick={clearSelection}
+                          aria-label="Close pinned details"
+                        >
+                          ✕
+                        </button>
+                      ) : null}
+                    </div>
                     <h2>{activeTask.task}</h2>
                     <div className="owner-row">
                       <span className="legend-chip">
@@ -1243,6 +1549,24 @@ export default function App() {
                       <div className="detail-label">Source</div>
                       <div className="detail-value">{activeTask.source}</div>
                     </div>
+                    {pinnedTaskId === activeTask.id ? (
+                      <div className="detail-block">
+                        <div className="detail-label">Quick reschedule</div>
+                        <div className="reschedule-row">
+                          <button type="button" className="secondary-btn" onClick={() => shiftTask(activeTask, -7)}>
+                            ◀ 1 week
+                          </button>
+                          <button type="button" className="secondary-btn" onClick={() => shiftTask(activeTask, 7)}>
+                            1 week ▶
+                          </button>
+                          <span className="note reschedule-note">Use Edit Work Item for exact dates.</span>
+                        </div>
+                      </div>
+                    ) : null}
+                    <div className="detail-block">
+                      <div className="detail-label">Flags</div>
+                      <TaskFlags task={activeTask} compact />
+                    </div>
                     <div className="hover-actions">
                       <Link className="primary-btn inline-action" to={`/tasks/${activeTask.id}`}>
                         Open Details
@@ -1252,7 +1576,7 @@ export default function App() {
                         className="secondary-btn"
                         onClick={() => openEditEditor(activeTask)}
                       >
-                        Edit Task
+                        Edit Work Item
                       </button>
                     </div>
                   </>
@@ -1268,13 +1592,37 @@ export default function App() {
           <AssignmentHub
             graph={assignmentHub}
             selectedTaskId={selectedHubTaskId}
-                selectedEmployeeId={selectedHubEmployeeId}
-                onMoveNode={handleHubNodeMove}
-                onSelectEmployee={handleSelectHubEmployee}
-                onSelectTask={handleSelectHubTask}
+            selectedEmployeeId={selectedHubEmployeeId}
+            burnoutByName={burnoutByName}
+            onMoveNode={handleHubNodeMove}
+            onSelectEmployee={handleSelectHubEmployee}
+            onSelectTask={handleSelectHubTask}
           />
         </section>
       </div>
+
+      {undo ? (
+        <div className="undo-toast" role="status">
+          <span>{undo.label}</span>
+          <button type="button" className="undo-btn" onClick={applyUndo}>
+            Undo
+          </button>
+          <button
+            type="button"
+            className="undo-dismiss"
+            onClick={() => setUndo(null)}
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
+
+      <LaneManagerModal
+        open={laneManagerOpen}
+        lanes={lanes}
+        onClose={() => setLaneManagerOpen(false)}
+      />
 
       <TaskEditorModal
         open={isEditorOpen}
