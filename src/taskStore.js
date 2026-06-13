@@ -719,6 +719,21 @@ export function removeLane(key) {
   return true;
 }
 
+// Reorders a lane by the given offset (-1 up, +1 down).
+export function moveLane(key, delta) {
+  const index = lanesState.findIndex((lane) => lane.key === key);
+  if (index < 0) return false;
+  const target = index + delta;
+  if (target < 0 || target >= lanesState.length) return false;
+  const next = [...lanesState];
+  const [item] = next.splice(index, 1);
+  next.splice(target, 0, item);
+  lanesState = next;
+  persistLanes();
+  emit();
+  return true;
+}
+
 // --- Task documents (local pilot storage as data URLs) ---
 
 export function addTaskDocument(taskId, doc = {}) {
@@ -927,6 +942,7 @@ if (typeof window !== "undefined") {
     addLane,
     renameLane,
     removeLane,
+    moveLane,
     exportRoadmap,
     importRoadmap,
     assessTaskRisk: (idOrTask) => {

@@ -1811,9 +1811,91 @@ a.dashboard-list-item:hover {
   }
 }
 
+/* --- Lane collapse on the roadmap --- */
+.lane-name {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.lane-name-text {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lane-collapse-btn {
+  appearance: none;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid rgba(76, 80, 97, 0.18);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.lane-collapse-btn:hover {
+  background: #fff;
+  color: var(--ink);
+}
+
+.lane-name.is-collapsed .lane-title {
+  font-size: 0.92rem;
+}
+
+.lane-track.is-collapsed {
+  background-image: none;
+}
+
 /* --- Lane manager --- */
 .lane-manager {
   width: min(720px, 100%);
+}
+
+.lane-row-top {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.lane-reorder {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding-top: 18px;
+}
+
+.lane-move-btn {
+  appearance: none;
+  width: 26px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid rgba(76, 80, 97, 0.18);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.66rem;
+  line-height: 1;
+}
+
+.lane-move-btn:hover:not(:disabled) {
+  background: #fff;
+  color: var(--ink);
+}
+
+.lane-move-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.lane-order-index {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .lane-list {
@@ -1831,6 +1913,8 @@ a.dashboard-list-item:hover {
 }
 
 .lane-row-fields {
+  flex: 1;
+  min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
   gap: 10px;

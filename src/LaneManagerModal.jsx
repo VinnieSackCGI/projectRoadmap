@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { addLane, removeLane, renameLane } from "./taskStore";
+import { addLane, moveLane, removeLane, renameLane } from "./taskStore";
 
-function LaneRow({ lane, canDelete }) {
+function LaneRow({ lane, index, total, canDelete }) {
   const [name, setName] = useState(lane.key);
   const [caption, setCaption] = useState(lane.caption || "");
   const [confirming, setConfirming] = useState(false);
@@ -28,15 +28,38 @@ function LaneRow({ lane, canDelete }) {
 
   return (
     <div className="lane-row">
-      <div className="lane-row-fields">
-        <label className="lane-field">
-          Lane name
-          <input type="text" value={name} onChange={(event) => setName(event.target.value)} />
-        </label>
-        <label className="lane-field">
-          Caption
-          <input type="text" value={caption} onChange={(event) => setCaption(event.target.value)} />
-        </label>
+      <div className="lane-row-top">
+        <div className="lane-reorder">
+          <button
+            type="button"
+            className="lane-move-btn"
+            onClick={() => moveLane(lane.key, -1)}
+            disabled={index === 0}
+            aria-label={`Move ${lane.key} up`}
+          >
+            ▲
+          </button>
+          <span className="lane-order-index">{index + 1}</span>
+          <button
+            type="button"
+            className="lane-move-btn"
+            onClick={() => moveLane(lane.key, 1)}
+            disabled={index === total - 1}
+            aria-label={`Move ${lane.key} down`}
+          >
+            ▼
+          </button>
+        </div>
+        <div className="lane-row-fields">
+          <label className="lane-field">
+            Lane name
+            <input type="text" value={name} onChange={(event) => setName(event.target.value)} />
+          </label>
+          <label className="lane-field">
+            Caption
+            <input type="text" value={caption} onChange={(event) => setCaption(event.target.value)} />
+          </label>
+        </div>
       </div>
 
       <div className="lane-row-actions">
@@ -129,13 +152,19 @@ export default function LaneManagerModal({ open, lanes, onClose }) {
         </div>
 
         <p className="note">
-          Rename lanes or adjust their captions, then Save. Removing a lane deletes the lane and
-          all of its work items, so it asks for a typed confirmation.
+          Reorder lanes with the arrows, rename them or adjust captions then Save. Removing a lane
+          deletes the lane and all of its work items, so it asks for a typed confirmation.
         </p>
 
         <div className="lane-list">
-          {lanes.map((lane) => (
-            <LaneRow key={lane.key} lane={lane} canDelete={lanes.length > 1} />
+          {lanes.map((lane, index) => (
+            <LaneRow
+              key={lane.key}
+              lane={lane}
+              index={index}
+              total={lanes.length}
+              canDelete={lanes.length > 1}
+            />
           ))}
         </div>
 

@@ -62,6 +62,7 @@ const HUB_CENTER_X = HUB_VIEWBOX_WIDTH / 2;
 const HUB_CENTER_Y = HUB_VIEWBOX_HEIGHT / 2;
 const HUB_POSITION_STORAGE_KEY = "project-roadmap-hub-positions-v1";
 const ZOOM_STORAGE_KEY = "project-roadmap-zoom-v1";
+const COLLAPSED_LANES_STORAGE_KEY = "project-roadmap-collapsed-lanes-v1";
 const LANE_LABEL_WIDTH = 220;
 
 // Timeline zoom levels. "Fit" keeps the whole FY26–FY28 window in view; the
@@ -244,6 +245,8 @@ function LaneTrack({
   matchFilters,
   activeTaskId,
   todayPosition,
+  collapsed,
+  onToggleCollapse,
   onTaskHover,
   onTaskMove,
   onTaskClick,
@@ -289,23 +292,40 @@ function LaneTrack({
   );
 
   const unitWidth = trackWidth > 0 ? trackWidth / TIMELINE_LENGTH : DEFAULT_TIMELINE_UNIT_WIDTH;
-  const laneHeight = Math.max(
-    148,
-    TASK_TOP_PADDING + laneLayout.rows.length * TASK_ROW_HEIGHT + TASK_BOTTOM_PADDING
-  );
+  const laneHeight = collapsed
+    ? 52
+    : Math.max(
+        148,
+        TASK_TOP_PADDING + laneLayout.rows.length * TASK_ROW_HEIGHT + TASK_BOTTOM_PADDING
+      );
 
   return (
     <>
       <div
-        className={`lane-name ${laneIndex % 2 === 1 ? "alt" : ""}`}
+        className={`lane-name ${laneIndex % 2 === 1 ? "alt" : ""} ${collapsed ? "is-collapsed" : ""}`}
         style={{ minHeight: `${laneHeight}px` }}
       >
-        <div className="lane-title">{lane.key}</div>
-        <div className="lane-caption">{lane.caption}</div>
+        <button
+          type="button"
+          className="lane-collapse-btn"
+          onClick={() => onToggleCollapse(lane.key)}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? `Expand ${lane.key}` : `Collapse ${lane.key}`}
+        >
+          {collapsed ? "▸" : "▾"}
+        </button>
+        <div className="lane-name-text">
+          <div className="lane-title">{lane.key}</div>
+          {collapsed ? (
+            <div className="lane-caption">{laneTasks.length} item{laneTasks.length === 1 ? "" : "s"}</div>
+          ) : (
+            <div className="lane-caption">{lane.caption}</div>
+          )}
+        </div>
       </div>
 
       <div
-        className={`lane-track ${laneIndex % 2 === 1 ? "alt" : ""}`}
+        className={`lane-track ${laneIndex % 2 === 1 ? "alt" : ""} ${collapsed ? "is-collapsed" : ""}`}
         ref={trackRef}
         style={{ minHeight: `${laneHeight}px` }}
       >
@@ -316,7 +336,9 @@ function LaneTrack({
             aria-hidden="true"
           />
         ) : null}
-        {laneLayout.assignments.map(({ item: task, rowIndex, start, end }) => {
+        {collapsed
+          ? null
+          : laneLayout.assignments.map(({ item: task, rowIndex, start, end }) => {
           const width = Math.max(20, (end - start) * unitWidth - BAR_TOTAL_INSET);
           const x = start * unitWidth + BAR_HORIZONTAL_INSET;
           const y = TASK_TOP_PADDING + rowIndex * TASK_ROW_HEIGHT;
@@ -694,6 +716,16 @@ export default function App() {
     const saved = window.localStorage.getItem(ZOOM_STORAGE_KEY);
     return ZOOM_LEVELS.some((level) => level.key === saved) ? saved : "fit";
   });
+  const [collapsedLanes, setCollapsedLanes] = useState(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const raw = window.localStorage.getItem(COLLAPSED_LANES_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      return new Set();
+    }
+  });
   const [undo, setUndo] = useState(null);
   const [selectedHubTaskId, setSelectedHubTaskId] = useState(null);
   const [selectedHubEmployeeId, setSelectedHubEmployeeId] = useState(null);
@@ -756,6 +788,35 @@ export default function App() {
       window.localStorage.setItem(ZOOM_STORAGE_KEY, zoomKey);
     }
   }, [zoomKey]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        COLLAPSED_LANES_STORAGE_KEY,
+        JSON.stringify([...collapsedLanes])
+      );
+    }
+  }, [collapsedLanes]);
+
+  const toggleLaneCollapsed = useCallback((key) => {
+    setCollapsedLanes((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
+  const collapseAllLanes = useCallback(() => {
+    setCollapsedLanes(new Set(lanes.map((lane) => lane.key)));
+  }, [lanes]);
+
+  const expandAllLanes = useCallback(() => {
+    setCollapsedLanes(new Set());
+  }, []);
 
   const matchFilters = useCallback(
     (task) => {
@@ -1327,6 +1388,13 @@ export default function App() {
                   </button>
                 ))}
               </div>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={collapsedLanes.size >= lanes.length ? expandAllLanes : collapseAllLanes}
+              >
+                {collapsedLanes.size >= lanes.length ? "Expand all" : "Collapse all"}
+              </button>
               <button type="button" className="secondary-btn" onClick={() => setLaneManagerOpen(true)}>
                 Manage lanes
               </button>
@@ -1386,6 +1454,8 @@ export default function App() {
                     matchFilters={matchFilters}
                     activeTaskId={activeTaskId}
                     todayPosition={todayPosition}
+                    collapsed={collapsedLanes.has(lane.key)}
+                    onToggleCollapse={toggleLaneCollapsed}
                     onTaskHover={handleTaskHover}
                     onTaskMove={handleTaskMove}
                     onTaskClick={handleTaskClick}
