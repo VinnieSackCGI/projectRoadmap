@@ -10,7 +10,7 @@ import { useSyncExternalStore } from "react";
 import {
   initialStaffing,
   initialTasks,
-  lanes,
+  lanes as defaultLanes,
   TASK_ENTITY_TYPES,
   TIMELINE_END_DATE,
   TIMELINE_START_DATE,
@@ -20,6 +20,7 @@ import { fetchRemoteRoadmap, pushRemoteRoadmap } from "./roadmapApi";
 
 const TASKS_KEY = "project-roadmap-tasks-v2";
 const STAFF_KEY = "project-roadmap-staffing-v2";
+const LANES_KEY = "project-roadmap-lanes-v1";
 const LEGACY_TASKS_KEY = "regional-planning-react-tasks-v1";
 const ROADMAP_DATE_SYNC_KEY = "project-roadmap-date-sync-v1";
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -28,6 +29,23 @@ const VALID_ENTITY_TYPES = new Set(TASK_ENTITY_TYPES);
 const listeners = new Set();
 let tasksState = [];
 let staffingState = [];
+// Seeded with the default lanes so early task normalization always has a valid
+// set to validate against; overwritten from storage during init below.
+let lanesState = defaultLanes.map((lane) => ({ ...lane }));
+
+function safeSetItem(key, value) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch (error) {
+    // Most likely a quota error (e.g. large embedded document data URLs).
+    console.warn(`Could not persist ${key} to localStorage:`, error);
+  }
+}
+
+export function getLanes() {
+  return lanesState;
+}
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -158,8 +176,8 @@ function withTaskDefaults(task, index = 0) {
     merged.id = `task-${index + 1}`;
   }
   merged.entityType = normalizeEntityType(merged.entityType, inferEntityType(merged));
-  if (!lanes.some((lane) => lane.key === merged.lane)) {
-    merged.lane = lanes[0].key;
+  if (!lanesState.some((lane) => lane.key === merged.lane)) {
+    merged.lane = lanesState[0]?.key || merged.lane;
   }
   // One-time migration: legacy `owners` free-text → ownerIds + externalOwners.
   if ((!merged.ownerIds || merged.ownerIds.length === 0) && merged.externalOwners === "" && merged.owners) {
@@ -386,8 +404,27 @@ function persistTasks() {
 }
 
 function persistTasksLocal() {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(TASKS_KEY, JSON.stringify(tasksState));
+  safeSetItem(TASKS_KEY, JSON.stringify(tasksState));
+}
+
+function loadLanesFromStorage() {
+  if (typeof window === "undefined") {
+    return defaultLanes.map((lane) => ({ ...lane }));
+  }
+  const raw = window.localStorage.getItem(LANES_KEY);
+  if (raw) {
+    const parsed = safeParse(raw);
+    if (parsed && parsed.length > 0) {
+      return parsed
+        .filter((lane) => lane && lane.key)
+        .map((lane) => ({ key: String(lane.key), caption: String(lane.caption || "") }));
+    }
+  }
+  return defaultLanes.map((lane) => ({ ...lane }));
+}
+
+function persistLanes() {
+  safeSetItem(LANES_KEY, JSON.stringify(lanesState));
 }
 
 function persistStaffing() {
@@ -396,8 +433,7 @@ function persistStaffing() {
 }
 
 function persistStaffingLocal() {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STAFF_KEY, JSON.stringify(staffingState));
+  safeSetItem(STAFF_KEY, JSON.stringify(staffingState));
 }
 
 // --- Shared-roadmap sync (Azure Static Web Apps /api/roadmap) ---
@@ -447,6 +483,7 @@ function emit() {
   listeners.forEach((fn) => fn());
 }
 
+lanesState = loadLanesFromStorage();
 tasksState = loadTasksFromStorage();
 staffingState = loadStaffingFromStorage();
 
@@ -626,6 +663,89 @@ export function importRoadmap(payload) {
   return true;
 }
 
+// --- Swim lane management (PM/Admin) ---
+
+export function addLane({ key, caption } = {}) {
+  const trimmed = (key || "").trim();
+  if (!trimmed) return false;
+  if (lanesState.some((lane) => lane.key.toLowerCase() === trimmed.toLowerCase())) {
+    return false;
+  }
+  lanesState = [...lanesState, { key: trimmed, caption: (caption || "").trim() }];
+  persistLanes();
+  emit();
+  return true;
+}
+
+export function renameLane(oldKey, { key, caption } = {}) {
+  const trimmed = (key || "").trim();
+  if (!trimmed) return false;
+  const existing = lanesState.find((lane) => lane.key === oldKey);
+  if (!existing) return false;
+  if (
+    trimmed.toLowerCase() !== oldKey.toLowerCase() &&
+    lanesState.some((lane) => lane.key.toLowerCase() === trimmed.toLowerCase())
+  ) {
+    return false;
+  }
+  lanesState = lanesState.map((lane) =>
+    lane.key === oldKey
+      ? { key: trimmed, caption: caption !== undefined ? caption : lane.caption }
+      : lane
+  );
+  if (trimmed !== oldKey) {
+    tasksState = tasksState.map((task) =>
+      task.lane === oldKey ? { ...task, lane: trimmed } : task
+    );
+    persistTasksLocal();
+  }
+  persistLanes();
+  emit();
+  return true;
+}
+
+// Removes the lane and every task/subtask assigned to it.
+export function removeLane(key) {
+  if (lanesState.length <= 1) return false;
+  if (!lanesState.some((lane) => lane.key === key)) return false;
+  lanesState = lanesState.filter((lane) => lane.key !== key);
+  const before = tasksState.length;
+  tasksState = tasksState.filter((task) => task.lane !== key);
+  if (tasksState.length !== before) {
+    persistTasksLocal();
+  }
+  persistLanes();
+  emit();
+  return true;
+}
+
+// --- Task documents (local pilot storage as data URLs) ---
+
+export function addTaskDocument(taskId, doc = {}) {
+  const task = getTask(taskId);
+  if (!task) return null;
+  const entry = {
+    id: generateId("doc"),
+    name: doc.name || "Untitled",
+    size: Number(doc.size) || 0,
+    type: doc.type || "",
+    dataUrl: doc.dataUrl || "",
+    uploadedAt: new Date().toISOString(),
+    uploadedBy: doc.uploadedBy || "Current user"
+  };
+  const documents = Array.isArray(task.documents) ? task.documents : [];
+  return updateTask(taskId, { documents: [...documents, entry] });
+}
+
+export function removeTaskDocument(taskId, docId) {
+  const task = getTask(taskId);
+  if (!task) return null;
+  const documents = (Array.isArray(task.documents) ? task.documents : []).filter(
+    (doc) => doc.id !== docId
+  );
+  return updateTask(taskId, { documents });
+}
+
 // --- Risk + burnout heuristics (used by UI badges and by the PM agent) ---
 
 export function assessTaskRisk(task) {
@@ -768,6 +888,10 @@ export function useStaffing() {
   return useSyncExternalStore(subscribe, getStaffing, getStaffing);
 }
 
+export function useLanes() {
+  return useSyncExternalStore(subscribe, getLanes, getLanes);
+}
+
 // --- Agent surface ---
 // A future PM agent can call these from the browser console or via an injected
 // chat panel. Keep the surface narrow and JSON-friendly.
@@ -797,6 +921,12 @@ if (typeof window !== "undefined") {
     replaceStaffing,
     addTaskFlag,
     resolveTaskFlag,
+    addTaskDocument,
+    removeTaskDocument,
+    listLanes: () => getLanes().map((lane) => ({ ...lane })),
+    addLane,
+    renameLane,
+    removeLane,
     exportRoadmap,
     importRoadmap,
     assessTaskRisk: (idOrTask) => {
@@ -807,6 +937,6 @@ if (typeof window !== "undefined") {
     refresh: () => hydrateFromRemote(),
     timelineStartDate: TIMELINE_START_DATE,
     timelineEndDate: TIMELINE_END_DATE,
-    lanes: lanes.map((lane) => ({ ...lane }))
+    lanes: getLanes().map((lane) => ({ ...lane }))
   };
 }

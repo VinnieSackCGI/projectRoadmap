@@ -12,7 +12,6 @@ import AppHeader from "./AppHeader";
 import TaskEditorModal from "./TaskEditorModal";
 import {
   bureauStyles,
-  lanes,
   quarters,
   TASK_STATUSES,
   TIMELINE_START_DATE,
@@ -24,13 +23,16 @@ import {
   assessTaskRisk,
   createTask as storeCreateTask,
   deleteTask as storeDeleteTask,
+  getLanes,
   getOpenFlags,
   resolveTaskOwners,
   updateTask as storeUpdateTask,
+  useLanes,
   useStaffing,
   useTasks
 } from "./taskStore";
 import TaskFlags from "./TaskFlags";
+import LaneManagerModal from "./LaneManagerModal";
 import {
   createEmptyWorkItemDraft,
   formatDateLabel,
@@ -229,7 +231,7 @@ function stackIntervals(items, getStart, getEnd) {
 
 function createEmptyDraft() {
   return createEmptyWorkItemDraft({
-    lane: lanes[0].key,
+    lane: getLanes()[0]?.key,
     bureau: Object.keys(bureauStyles)[0],
     fallbackDate: toIsoDate(new Date())
   });
@@ -680,6 +682,8 @@ function AssignmentHub({
 export default function App() {
   const tasks = useTasks();
   const staffing = useStaffing();
+  const lanes = useLanes();
+  const [laneManagerOpen, setLaneManagerOpen] = useState(false);
   const [filter, setFilter] = useState([]);
   const [statusFilter, setStatusFilter] = useState([]);
   const [flaggedOnly, setFlaggedOnly] = useState(false);
@@ -971,7 +975,7 @@ export default function App() {
     );
 
     return { employees, projects, connections, laneLabels };
-  }, [hubPositionOverrides, staffing, visibleTasks]);
+  }, [hubPositionOverrides, lanes, staffing, visibleTasks]);
 
   const burnoutByName = useMemo(() => {
     const list = assessStaffBurnout(staffing, tasks);
@@ -1323,6 +1327,9 @@ export default function App() {
                   </button>
                 ))}
               </div>
+              <button type="button" className="secondary-btn" onClick={() => setLaneManagerOpen(true)}>
+                Manage lanes
+              </button>
               <button type="button" className="primary-btn" onClick={openCreateEditor}>
                 Add Work Item
               </button>
@@ -1540,6 +1547,12 @@ export default function App() {
           </button>
         </div>
       ) : null}
+
+      <LaneManagerModal
+        open={laneManagerOpen}
+        lanes={lanes}
+        onClose={() => setLaneManagerOpen(false)}
+      />
 
       <TaskEditorModal
         open={isEditorOpen}

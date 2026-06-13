@@ -2,15 +2,17 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AppHeader from "./AppHeader";
 import TaskEditorModal from "./TaskEditorModal";
-import { bureauStyles, lanes, TASK_STATUSES } from "./data";
+import { bureauStyles, TASK_STATUSES } from "./data";
 import {
   assessTaskRisk,
   createTask as storeCreateTask,
   deleteTask as storeDeleteTask,
   exportRoadmap,
+  getLanes,
   importRoadmap,
   resolveTaskOwners,
   updateTask as storeUpdateTask,
+  useLanes,
   useStaffing,
   useTasks
 } from "./taskStore";
@@ -67,7 +69,7 @@ function riskClass(level) {
 
 function createEmptyDraft() {
   return createEmptyWorkItemDraft({
-    lane: lanes[0].key,
+    lane: getLanes()[0]?.key,
     bureau: Object.keys(bureauStyles)[0],
     fallbackDate: new Date().toISOString().slice(0, 10)
   });
@@ -88,6 +90,7 @@ const INITIAL_FILTERS = {
 export default function TasksPage() {
   const tasks = useTasks();
   const staffing = useStaffing();
+  const lanes = useLanes();
   const bureauOptions = useMemo(
     () => [...new Set([...Object.keys(bureauStyles), ...tasks.map((task) => task.bureau)])],
     [tasks]

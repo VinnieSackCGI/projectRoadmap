@@ -2,18 +2,21 @@ import React, { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import AppHeader from "./AppHeader";
 import TaskEditorModal from "./TaskEditorModal";
-import { bureauStyles, lanes } from "./data";
+import { bureauStyles } from "./data";
 import {
   assessTaskRisk,
   createTask as storeCreateTask,
   deleteTask as storeDeleteTask,
+  getLanes,
   getSubtasks,
   resolveTaskOwners,
   updateTask as storeUpdateTask,
+  useLanes,
   useStaffing,
   useTasks
 } from "./taskStore";
 import TaskFlags from "./TaskFlags";
+import TaskDocuments from "./TaskDocuments";
 import {
   createEmptyWorkItemDraft,
   formatDateLabel,
@@ -25,7 +28,7 @@ import backgroundImage from "../design/dos wave background.jpg";
 
 function createEmptyDraft() {
   return createEmptyWorkItemDraft({
-    lane: lanes[0].key,
+    lane: getLanes()[0]?.key,
     bureau: Object.keys(bureauStyles)[0]
   });
 }
@@ -106,6 +109,7 @@ export default function TaskDetailsPage() {
   const navigate = useNavigate();
   const tasks = useTasks();
   const staffing = useStaffing();
+  const lanes = useLanes();
   const bureauOptions = useMemo(
     () => [...new Set([...Object.keys(bureauStyles), ...tasks.map((entry) => entry.bureau)])],
     [tasks]
@@ -317,6 +321,10 @@ export default function TaskDetailsPage() {
               <div className="section-title" style={{ marginTop: 20 }}>Flags</div>
               <h2>Risk & scope flags</h2>
               <TaskFlags task={task} />
+
+              <div className="section-title" style={{ marginTop: 20 }}>Documents</div>
+              <h2>Attachments</h2>
+              <TaskDocuments task={task} />
 
               <div className="subtask-section-head">
                 <div>
