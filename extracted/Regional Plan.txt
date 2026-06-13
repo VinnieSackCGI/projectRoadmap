@@ -1,0 +1,303 @@
+PI Planning Preparation – Regional Bureau
+1. Objectives
+The primary objective of this PI planning session is to coordinate and align work across the CGI in support of CGFS and the regional executive offices, in line with the MOUs for:
+WHA (Western Hemisphere Affairs)
+SCA (South and Central Asia)
+CARE
+NEA (Near Eastern Affairs)
+Iraq portfolio
+Iran / Middle East Evacuations
+The session aims to:
+Gain a clear understanding of ongoing initiatives, statutory and policy driven responsibilities, and priorities for each regional bureau and portfolio.
+Establish a path forward for each bureau, including next steps, key deliverables, and timelines, documented through bureau specific Strategic Roadmaps.
+Define crosscutting workstreams (e.g., appropriations support, budget execution support, training/OCM, environments and integrations, licensing/funding, and risk/dispute management) to meet MOU obligations.
+Outputs of the PI planning session will include:
+Draft Strategic Roadmaps for WHA, NEA/SCAEX (including Iraq), and CARE, to be reviewed and approved by bureau leadership and CGFS/CIO in subsequent quarterly roadmap reviews.
+A prioritized PI backlog of epics and features that aligns with the MOUs and the government fiscal year.
+2. Schedule and Scope
+2.1 Delivery Targets (Aligned to the Government Fiscal Year)
+Estimated delivery dates are aligned to the government fiscal year and reflect both solution build and required governance/approvals:
+WHA
+Domestic Budget Execution & Tracking Solution (Domestic Solution + Dashboard): Begin delivery in Q3.
+WHA Strategic Roadmap: Initial approval in early Q3; quarterly roadmap reviews thereafter.
+NEA
+Domestic Solution leveraging WHA pattern: Mid Q3.
+NEA Strategic Roadmap (including Iraq): initial approval in Q3; quarterly reviews.
+SCA
+Domestic Solution leveraging WHA pattern: Mid Q3.
+SCA Strategic Roadmap: initial approval in Q3; quarterly reviews.
+CARE
+Financial Management Solution in O&M: Ongoing (operational support).
+Program Efficiency Stream: Delivery Q3 with potential extension.
+Appropriations Cycle and Oversight Support: aligned with the appropriations calendar (BRR, CBJ, OMB/Congressional engagements).
+Iraq Portfolio (NEA)
+Iraq Financial Management Roadmap: Q3.
+Iraq Solution (normalized for extension to multiple countries): Initial capabilities by mid Q4; roadmap for long term operational efficiency.
+Middle East Evacuation / Crisis Management (NEA)
+Dashboard and NEA Tracking Application: Emergency work; deliverable as soon as possible, with sprint schedules adjusted to accommodate evolving crisis needs.
+2.2 Potential Future Work
+As opportunities arise and funding is made available, additional regional partners and enterprise capabilities will be incorporated:
+Regional Bureaus: Ukraine, EUR, EAP, AF.
+Regional Portal: Central hub for all regional tools, solutions, and documentation (including disaster readiness and representation/gift tracking).
+Overseas Dashboard: Aggregates data from posts worldwide and supports overseas budget execution, traceability, and foreign assistance oversight.
+2.3 Governance and Roadmap Cadence
+In alignment with the MOUs:
+Each regional partner (WHA, NEA/SCAEX, CARE, Iraq) will maintain a Strategic Roadmap that:
+Includes high level milestones and objectives decomposed into epics and features.
+Is reviewed and refined during quarterly roadmap review sessions with CGFS/CIO and partner bureau leadership.
+PI Planning will:
+Update the Strategic Roadmaps.
+Identify PI level objectives and features aligned to those roadmaps.
+Prepare for backlog grooming before each PI and quarterly roadmap review.
+3. Vision
+The long-term vision for CGI’s work in the regional bureaus is to continue expanding CGI’s presence and support across additional regional sections while standardizing core financial solutions and sharing best practices across the enterprise.
+Currently, CGI supports WHA, SCA, and NEA (including CARE and Iraq). The strategic growth plan includes:
+EAP: Targeted for procurement in the current fiscal year Q4 – Q1 FY27.
+Ukraine and AF: Targeted for procurement by FY27.
+EUR: Targeted for procurement by FY28.
+Key Outcomes Sought
+Distribution of the Domestic Budget Execution and Tracking Solution To current regional partners (WHA, SCA/NEA), including:
+Budget Formulation Module: Streamlining and standardizing domestic budget planning and submission.
+Domestic Dashboard Module: Providing actionable insights and data visualization (plan vs execution, burn rate, projections, Status of Funds) for leadership and program users.
+Development of Overseas Solutions
+Overseas Budget Formulation Solution: Enabling budget planning and execution tracking at post level.
+Overseas Dashboard:
+Visualizing posts on a world map.
+Enabling bureaus to understand missions’ locations, timing, scope, and financial posture globally.
+Supporting overseas traceability and foreign assistance oversight.
+Implementation of the Regional Portal
+Central hub for all regional tools, solutions, documentation, and training.
+Seamless access and integration to domestic, overseas, disaster readiness, and representation/gift capabilities.
+Disaster Readiness Workstream
+A module within the portal that:
+Provides tools and structured data entry for global users to record and track disaster related spending and activities.
+Includes SOPs and quick reference guidance for what to do when an event occurs (functional playbooks aligned with bureau policies).
+Supports leadership reporting and comprehensive disaster data perspectives.
+Representation and Gift Application
+Domestic and overseas data capture for representation and gift events.
+Rollup into bureau and regional dashboards for spend tracking and compliance.
+Support for Appropriations Cycle and Oversight (NEA/SCAEX and CARE)
+Appropriations Cycle Roadmaps and SOPs. (Didn’t need it so we didn’t do it)
+Annual Spend Plan support.
+BRR/CBJ/OMB/Congressional support.
+Historical crosswalks for CARE (OAW/CARE/EW).
+4. Opportunities and Challenges
+4.1 Opportunities
+Expansion of regional partnerships to Ukraine, EUR, AF, and EAP.
+Extension of domestic and overseas solutions to post level operations.
+Proactive technology integration: leveraging AI tools (e.g., StateChat, GitHub Copilot) and modern low code platforms to enhance efficiency and user experience.
+Disaster readiness solution: a flexible module supporting global users, leadership views, and compliance with audit/oversight expectations.
+Regional collaboration and knowledge sharing: using common frameworks and the Regional Portal to reduce duplication and accelerate adoption.
+Grants & DRL PRM
+4.2 Challenges
+Resource allocation and continuity: staff shifting between projects disrupts knowledge transfer and can impact roadmap commitments.
+Siloed solutioning: limited visibility across regional projects leads to duplication and missed synergies; the Regional Portal and quarterly roadmap reviews will mitigate this.
+Security and compliance risks: overseas dashboards and integrations must adhere to least privilege access, CGFS/DT policies, and audit readiness requirements.
+Cost effective disaster readiness: delivering robust, scalable solutions that remain within bureau funding constraints.
+Transition from SAP Hana to Data Bricks (Data lake): Started to implement some of the data SOF is coming from datalake.
+Licensing and Funding: Clarifying who funds which licenses and environments for each bureau; aligning epics to quarterly funding reviews and MOU mandated cost estimation processes.
+Managing urgent/emergency work (e.g., Middle East evacuations) without jeopardizing core roadmap commitments.
+5. Prioritization Approach
+5.1 Urgent/Emergency Work
+Once a baseline PI plan is established, urgent or emergency work (e.g., crisis events, new Congressional reporting) will be prioritized and accepted as needed.
+Sprint schedules and PI scope will be adjusted through formal change control and communication with partner bureau leadership.
+For urgent work, we will document impacts to scope, schedule, and funding, in line with MOU requirements for cost estimation and approvals.
+5.2 Strategic Focus
+Deliver the WHA Domestic Budget Execution & Tracking solution first, as a template for NEA, SCA, and others, to streamline subsequent implementations.
+Implement crosscutting workstreams that support all regional partners, including:
+Appropriations and Spend Plan support (NEA/SCAEX & CARE).
+Budget Execution & Operations Support.
+Requirements Documents, training, documentation, and change management.
+Environments and data integrations.
+Licensing & Cost Management.
+6. Success Criteria
+Success at the end of the planning year will be measured by:
+Stakeholder Approval
+Signed off Strategic Roadmaps and requirements/design documentation by all relevant stakeholders (CGFS/CIO, partner bureaus).
+Formal software acceptance (post UAT) for key releases.
+Key Performance Indicators (KPIs)
+Reduction in time managing untagged or misclassified transactions.
+Improved data visibility (e.g., adoption of dashboards, reduction in manual reports).
+Decreased time to estimate future year budgets and generate Spend Plan and appropriations materials.
+Number of active users and frequency of key actions in the domestic and overseas solutions.
+Audit readiness ($ focus)
+Recovery Funds (Getting ULOs back)
+Admin Standup time
+Error reduction
+User Acceptance Testing (UAT)
+Completion of planned UAT cycles (e.g., at least one two week UAT period per major release), with issues triaged and remediated.
+Documentation and Training
+Delivery of user guides, quick reference guides (QRGs), SOPs, and technical documentation for all in scope solutions.
+Completion of agreed training sessions and briefings with bureau stakeholders; positive feedback on usability and clarity.
+7. Participants
+Key participants for the PI planning session: (put into an org chart)
+Nupur Moondra – Director and Lead for Regional Work
+Vinson Sack – Technical Lead for Regional Work
+Kevin Schweiss – Solutioning SME*
+Briana Jackson – Functional SME*
+Evan Moller – Technical SME*
+Ziv Agasi – Technical
+Matthew Ford – Technical
+Scott Florence – Functional
+Isaiah Wood – Functional
+Benjamin Eidelkind – Functional
+Osmar Rosales Jimenez – Functional
+Eric Thaxton – Functional
+Andrew Hill – Functional
+Fatima Barry – Functional
+Russel Sherrod – Functional
+(*Advisory roles)
+8. Solution Profiles (Regional Offerings)
+For each solution, PI planning will capture both functional and technical aspects, as well as governance and integration requirements.
+8.1 Domestic Budget Formulation & Execution Solution
+Functional Use Case
+Business Need:
+Standardize domestic budget formulation, execution tracking, and reporting across regional bureaus.
+User Story/Scenario:
+As a bureau budget officer, I can plan, submit, and monitor my budget, view plan vs actuals, and generate Spend Plan and appropriations support materials.
+Key Functional Requirements:
+Budget planning and submission.
+Funds control and execution tracking.
+Projections and forecasting.
+BRR/CBJ/appropriations reporting extracts.
+Technical Use Case
+Architecture Overview
+Custom Page(s)
+Model-Driven Apps
+Automations
+Plugin Code
+Dataflows/ETL
+Integrations: GBI, GFMS, IBIS, RFMS/M, GInvoicing, IPP, E2, ILMS/Ariba (as applicable).
+Environment & Security: Dev/UAT/Prod environments, Power BI Gateway, Azure role setup in coordination with DT.
+Governance Gates: Requirements signoff, design signoff, UAT & production acceptance.
+8.2 Domestic Dashboard Solution
+Functional Use Case
+Business Need:
+User Story/Scenario:
+Key Functional Requirements:
+Technical Use Case
+Architecture Overview:
+Custom Page(s):
+Model-Driven Apps:
+Automations:
+Plugin Code:
+Dataflows/ETL:
+Other Technical Components:
+8.3 Overseas (Post) Budget Formulation Solution
+Functional Use Case
+Business Need:
+User Story/Scenario:
+Key Functional Requirements:
+Technical Use Case
+Architecture Overview:
+Custom Page(s):
+Model-Driven Apps:
+Automations:
+Plugin Code:
+Dataflows/ETL:
+Other Technical Components:
+8.4 Overseas Dashboard Solution
+Functional Use Case
+Business Need:
+User Story/Scenario:
+Key Functional Requirements:
+Technical Use Case
+Architecture Overview:
+Custom Page(s):
+Model-Driven Apps:
+Automations:
+Plugin Code:
+Dataflows/ETL:
+Other Technical Components:
+8.5 Regional Portal
+Functional Use Case
+Business Need:
+User Story/Scenario:
+Key Functional Requirements:
+Technical Use Case
+Architecture Overview:
+Custom Page(s):
+Model-Driven Apps:
+Automations:
+Plugin Code:
+Dataflows/ETL:
+Other Technical Components:
+8.6 Disaster Readiness Module
+Functional Use Case
+Business Need:
+User Story/Scenario:
+Key Functional Requirements:
+Technical Use Case
+Architecture Overview:
+Custom Page(s):
+Model-Driven Apps:
+Automations:
+Plugin Code:
+Dataflows/ETL:
+Other Technical Components:
+8.7 CARE Solution
+Functional Use Case
+Business Need:
+User Story/Scenario:
+Key Functional Requirements:
+Technical Use Case
+Architecture Overview:
+Custom Page(s):
+Model-Driven Apps:
+Automations:
+Plugin Code:
+Dataflows/ETL:
+Other Technical Components:
+8.8 Iraq Solution (Normalized for Multiple Countries)
+Functional Use Case
+Business Need:
+User Story/Scenario:
+Key Functional Requirements:
+Technical Use Case
+Architecture Overview:
+Custom Page(s):
+Model-Driven Apps:
+Automations:
+Plugin Code:
+Dataflows/ETL:
+Other Technical Components:
+8.9 Representation & Gift Application
+Functional Use Case
+Business Need:
+User Story/Scenario:
+Key Functional Requirements:
+Technical Use Case
+Architecture Overview:
+Custom Page(s):
+Model-Driven Apps:
+Automations:
+Plugin Code:
+Dataflows/ETL:
+Other Technical Components:
+9. Bureau Profiles
+For each bureau, PI planning will capture:
+9.1 WHA (Western Hemisphere Affairs)
+Use Case:
+Original business need and core requirements (budget execution and financial operations support, Budget Execution Tracking System, regional collaboration).
+Current State:
+Progress, achievements, ongoing challenges, current level of solution deployment and support.
+Path Forward:
+Next steps and desired outcomes, including roadmap items for domestic solution, regional portal, and overseas capabilities.
+Key Challenges:
+Specific risks or constraints (e.g., data quality, staffing, integrations).
+9.2 NEA (Near Eastern Affairs)
+Use Case:
+What was the original reason or business need & Core requirements?
+Current State:
+Where are we now? (Progress, achievements, ongoing challenges, or current status of support.)
+Path Forward
+Where do we need to go? (Next steps & desired outcomes)
+Key challenges
+9.3 SCA (South and Central Asian Affairs) / CARE
+Use Case:
+What was the original reason or business need & Core requirements?
+Current State:
+Where are we now? (Progress, achievements, ongoing challenges, or current status of support.)
+Path Forward
+Where do we need to go? (Next steps & desired outcomes)
+Key challenges

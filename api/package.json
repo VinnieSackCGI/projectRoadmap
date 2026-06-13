@@ -1,0 +1,13 @@
+{
+  "name": "regional-planning-api",
+  "version": "1.0.0",
+  "description": "Shared roadmap storage API for the Regional Planning app",
+  "main": "src/functions/*.js",
+  "scripts": {
+    "start": "func start"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.5.0",
+    "@azure/storage-blob": "^12.24.0"
+  }
+}

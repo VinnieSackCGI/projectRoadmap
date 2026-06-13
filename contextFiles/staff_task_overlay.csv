@@ -1,0 +1,14 @@
+Person,Role Type,Tasks or Focus Areas,Display Recommendation
+Nupur Moondra,Leadership,Regional oversight and approvals,Show as milestone sponsor row only
+Vinson Sack,Leadership,Regional oversight and technical roadmap ownership,Show as milestone sponsor row only
+Jason Jensen,Technical,Domestic Module (WHA); Overseas Module (WHA),Use initials on WHA bars
+Matt Ford,Technical,Domestic Module (NEA/SCA); WHA support; Iraq; Middle East evacuation dashboard and app; WCF freight forward; Apptio replacement,Use initials on bars plus count badge for heavily loaded periods
+Ziv Agasi,Technical,Regional data support; dashboard and data work; spend plan analytics,Use initials on data-heavy bars
+Scott Florence,Functional,CARE; IRAQ; NEA/SCA; WHA,Use initials on functional bars
+Isaiah Wood,Mix,CARE; IRAQ; NEA/SCA; WHA,Use initials on cross-functional bars
+Fatima Barry,Functional,CARE program efficiency; disaster plan,Use initials on CARE and disaster bars
+Andrew Hill,Functional,CARE program efficiency; disaster plan,Use initials on CARE and disaster bars
+Russell Sherrod,Functional,CARE program efficiency; disaster plan; IRAQ,Use initials on CARE, disaster, and Iraq bars
+Benjamin Eidelkind,Functional,CARE 50 percent; ECA 50 percent,Show as split allocation note not full bar label
+Osmar Rosales,Functional,IRAQ; Middle East app,Use initials on Iraq and evacuation bars
+Eric Thaxton,Functional,IRAQ; CA 50 percent,Show as Iraq support and split allocation note
