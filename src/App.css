@@ -1898,6 +1898,35 @@ a.dashboard-list-item:hover {
   font-weight: 700;
 }
 
+.lane-drag-handle {
+  width: 26px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid rgba(76, 80, 97, 0.18);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--muted);
+  cursor: grab;
+  font-size: 0.8rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.lane-drag-handle:active {
+  cursor: grabbing;
+}
+
+.lane-row.is-dragging {
+  opacity: 0.5;
+}
+
+.lane-row.is-drop-target {
+  border-color: rgba(15, 118, 110, 0.6);
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.25);
+}
+
 .lane-list {
   display: grid;
   gap: 12px;

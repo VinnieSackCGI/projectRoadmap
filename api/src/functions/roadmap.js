@@ -15,17 +15,18 @@ function getContainerClient() {
 async function readRoadmap() {
   const blob = getContainerClient().getBlockBlobClient(BLOB);
   if (!(await blob.exists())) {
-    return { tasks: [], staffing: [] };
+    return { tasks: [], staffing: [], lanes: [] };
   }
   const buffer = await blob.downloadToBuffer();
   try {
     const parsed = JSON.parse(buffer.toString("utf8"));
     return {
       tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
-      staffing: Array.isArray(parsed.staffing) ? parsed.staffing : []
+      staffing: Array.isArray(parsed.staffing) ? parsed.staffing : [],
+      lanes: Array.isArray(parsed.lanes) ? parsed.lanes : []
     };
   } catch {
-    return { tasks: [], staffing: [] };
+    return { tasks: [], staffing: [], lanes: [] };
   }
 }
 
@@ -35,6 +36,7 @@ async function writeRoadmap(data) {
   const body = JSON.stringify({
     tasks: Array.isArray(data.tasks) ? data.tasks : [],
     staffing: Array.isArray(data.staffing) ? data.staffing : [],
+    lanes: Array.isArray(data.lanes) ? data.lanes : [],
     updatedAt: new Date().toISOString()
   });
   await container

@@ -1,7 +1,18 @@
 import React, { useState } from "react";
-import { addLane, moveLane, removeLane, renameLane } from "./taskStore";
+import { addLane, moveLane, removeLane, renameLane, reorderLane } from "./taskStore";
 
-function LaneRow({ lane, index, total, canDelete }) {
+function LaneRow({
+  lane,
+  index,
+  total,
+  canDelete,
+  isDragging,
+  isOver,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd
+}) {
   const [name, setName] = useState(lane.key);
   const [caption, setCaption] = useState(lane.caption || "");
   const [confirming, setConfirming] = useState(false);
@@ -27,9 +38,23 @@ function LaneRow({ lane, index, total, canDelete }) {
   };
 
   return (
-    <div className="lane-row">
+    <div
+      className={`lane-row ${isDragging ? "is-dragging" : ""} ${isOver ? "is-drop-target" : ""}`}
+      onDragOver={(event) => onDragOver(event, index)}
+      onDrop={() => onDrop(index)}
+    >
       <div className="lane-row-top">
         <div className="lane-reorder">
+          <div
+            className="lane-drag-handle"
+            draggable
+            onDragStart={() => onDragStart(lane.key)}
+            onDragEnd={onDragEnd}
+            title="Drag to reorder"
+            aria-hidden="true"
+          >
+            ⠿
+          </div>
           <button
             type="button"
             className="lane-move-btn"
@@ -133,9 +158,33 @@ function AddLaneForm() {
 }
 
 export default function LaneManagerModal({ open, lanes, onClose }) {
+  const [dragKey, setDragKey] = useState(null);
+  const [overIndex, setOverIndex] = useState(null);
+
   if (!open) {
     return null;
   }
+
+  const handleDragStart = (key) => {
+    setDragKey(key);
+    setOverIndex(null);
+  };
+  const handleDragOver = (event, index) => {
+    if (!dragKey) return;
+    event.preventDefault();
+    setOverIndex(index);
+  };
+  const handleDrop = (index) => {
+    if (dragKey) {
+      reorderLane(dragKey, index);
+    }
+    setDragKey(null);
+    setOverIndex(null);
+  };
+  const handleDragEnd = () => {
+    setDragKey(null);
+    setOverIndex(null);
+  };
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
@@ -152,8 +201,9 @@ export default function LaneManagerModal({ open, lanes, onClose }) {
         </div>
 
         <p className="note">
-          Reorder lanes with the arrows, rename them or adjust captions then Save. Removing a lane
-          deletes the lane and all of its work items, so it asks for a typed confirmation.
+          Drag the handle (or use the arrows) to reorder lanes, rename them or adjust captions then
+          Save. Removing a lane deletes the lane and all of its work items, so it asks for a typed
+          confirmation.
         </p>
 
         <div className="lane-list">
@@ -164,6 +214,12 @@ export default function LaneManagerModal({ open, lanes, onClose }) {
               index={index}
               total={lanes.length}
               canDelete={lanes.length > 1}
+              isDragging={dragKey === lane.key}
+              isOver={overIndex === index && dragKey && dragKey !== lane.key}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onDragEnd={handleDragEnd}
             />
           ))}
         </div>

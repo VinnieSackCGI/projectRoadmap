@@ -423,8 +423,13 @@ function loadLanesFromStorage() {
   return defaultLanes.map((lane) => ({ ...lane }));
 }
 
-function persistLanes() {
+function persistLanesLocal() {
   safeSetItem(LANES_KEY, JSON.stringify(lanesState));
+}
+
+function persistLanes() {
+  persistLanesLocal();
+  schedulePush();
 }
 
 function persistStaffing() {
@@ -443,7 +448,7 @@ let remoteAvailable = false;
 
 function schedulePush() {
   if (!remoteAvailable) return;
-  pushRemoteRoadmap(() => ({ tasks: tasksState, staffing: staffingState }));
+  pushRemoteRoadmap(() => ({ tasks: tasksState, staffing: staffingState, lanes: lanesState }));
 }
 
 async function hydrateFromRemote() {
@@ -456,6 +461,16 @@ async function hydrateFromRemote() {
   remoteAvailable = true;
   let changed = false;
   let remoteWasEmpty = true;
+
+  // Lanes first, so incoming tasks validate against the shared lane set.
+  if (Array.isArray(remote.lanes) && remote.lanes.length > 0) {
+    lanesState = remote.lanes
+      .filter((lane) => lane && lane.key)
+      .map((lane) => ({ key: String(lane.key), caption: String(lane.caption || "") }));
+    persistLanesLocal();
+    changed = true;
+    remoteWasEmpty = false;
+  }
 
   if (remote.tasks.length > 0) {
     tasksState = normalizeTaskCollection(remote.tasks);
@@ -719,19 +734,26 @@ export function removeLane(key) {
   return true;
 }
 
-// Reorders a lane by the given offset (-1 up, +1 down).
-export function moveLane(key, delta) {
-  const index = lanesState.findIndex((lane) => lane.key === key);
-  if (index < 0) return false;
-  const target = index + delta;
-  if (target < 0 || target >= lanesState.length) return false;
+// Moves a lane to an absolute index (used by drag-and-drop reordering).
+export function reorderLane(key, toIndex) {
+  const from = lanesState.findIndex((lane) => lane.key === key);
+  if (from < 0) return false;
+  const target = Math.max(0, Math.min(lanesState.length - 1, toIndex));
+  if (from === target) return false;
   const next = [...lanesState];
-  const [item] = next.splice(index, 1);
+  const [item] = next.splice(from, 1);
   next.splice(target, 0, item);
   lanesState = next;
   persistLanes();
   emit();
   return true;
+}
+
+// Reorders a lane by the given offset (-1 up, +1 down).
+export function moveLane(key, delta) {
+  const index = lanesState.findIndex((lane) => lane.key === key);
+  if (index < 0) return false;
+  return reorderLane(key, index + delta);
 }
 
 // --- Task documents (local pilot storage as data URLs) ---
@@ -943,6 +965,7 @@ if (typeof window !== "undefined") {
     renameLane,
     removeLane,
     moveLane,
+    reorderLane,
     exportRoadmap,
     importRoadmap,
     assessTaskRisk: (idOrTask) => {
