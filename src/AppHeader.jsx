@@ -6,7 +6,8 @@ const NAV_ITEMS = [
   { to: "/", label: "Roadmap", end: true },
   { to: "/tasks", label: "Work Items" },
   { to: "/staffing", label: "Staffing" },
-  { to: "/executive", label: "Executive" }
+  { to: "/executive", label: "Executive" },
+  { to: "/help", label: "Guide" }
 ];
 
 const CURRENT_USER = {

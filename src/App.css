@@ -2081,6 +2081,60 @@ a.dashboard-list-item:hover {
   font-size: 0.76rem;
 }
 
+/* --- Guide / How-to page --- */
+.help-shell {
+  display: grid;
+  gap: 20px;
+  align-content: start;
+}
+
+.help-section {
+  scroll-margin-top: calc(var(--header-bottom-height) + 16px);
+}
+
+.help-section h3 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+}
+
+.help-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.help-toc-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(76, 80, 97, 0.14);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.85rem;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.help-toc-link:hover {
+  background: #fffdf8;
+  border-color: rgba(15, 118, 110, 0.35);
+}
+
+.help-steps {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 10px;
+  color: #2e3543;
+  line-height: 1.5;
+}
+
+.help-steps strong {
+  color: var(--ink);
+}
+
 @media (max-width: 760px) {
   .filter-group {
     grid-template-columns: 1fr;
