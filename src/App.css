@@ -1811,6 +1811,56 @@ a.dashboard-list-item:hover {
   }
 }
 
+/* --- Roadmap filter groups --- */
+.filter-group {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.filter-group-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.filter-reset {
+  padding: 6px 12px;
+  font-size: 0.76rem;
+}
+
+@media (max-width: 760px) {
+  .filter-group {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
+/* --- Quick reschedule (keyboard accessible) --- */
+.reschedule-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.reschedule-row .secondary-btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+.reschedule-note {
+  font-size: 0.78rem;
+}
+
+/* --- Keyboard focus ring on roadmap bars --- */
+.task-bar:focus-visible {
+  outline: 3px solid #f0c476;
+  outline-offset: 2px;
+}
+
 /* --- Timeline zoom controls --- */
 .roadmap-header-actions {
   display: flex;

@@ -14,6 +14,7 @@ import {
   bureauStyles,
   lanes,
   quarters,
+  TASK_STATUSES,
   TIMELINE_START_DATE,
   TIMELINE_END_DATE,
   years
@@ -58,6 +59,7 @@ const HUB_VIEWBOX_HEIGHT = 840;
 const HUB_CENTER_X = HUB_VIEWBOX_WIDTH / 2;
 const HUB_CENTER_Y = HUB_VIEWBOX_HEIGHT / 2;
 const HUB_POSITION_STORAGE_KEY = "project-roadmap-hub-positions-v1";
+const ZOOM_STORAGE_KEY = "project-roadmap-zoom-v1";
 const LANE_LABEL_WIDTH = 220;
 
 // Timeline zoom levels. "Fit" keeps the whole FY26–FY28 window in view; the
@@ -237,7 +239,7 @@ function LaneTrack({
   lane,
   laneIndex,
   tasks,
-  filter,
+  matchFilters,
   activeTaskId,
   todayPosition,
   onTaskHover,
@@ -269,12 +271,10 @@ function LaneTrack({
     };
   }, []);
 
-  const laneTasks = useMemo(() => {
-    const scoped = tasks.filter((task) => task.lane === lane.key);
-    return filter.length === 0
-      ? scoped
-      : scoped.filter((task) => filter.includes(task.bureau));
-  }, [tasks, filter, lane.key]);
+  const laneTasks = useMemo(
+    () => tasks.filter((task) => task.lane === lane.key && matchFilters(task)),
+    [tasks, matchFilters, lane.key]
+  );
 
   const laneLayout = useMemo(
     () =>
@@ -352,6 +352,7 @@ function LaneTrack({
                   background: `linear-gradient(135deg, ${bureauColor(task.bureau)}, rgba(20, 26, 35, 0.86))`,
                   "--bureau-accent": bureauColor(task.bureau)
                 }}
+                title={`${task.task} · ${formatDateLabel(task.startDate)} – ${formatDateLabel(task.endDate)}`}
                 onMouseEnter={(event) => onTaskHover(task, event, event.currentTarget)}
                 onMouseMove={(event) => onTaskMove(task, event)}
                 onFocus={(event) => onTaskHover(task, null, event.currentTarget)}
@@ -680,9 +681,15 @@ export default function App() {
   const tasks = useTasks();
   const staffing = useStaffing();
   const [filter, setFilter] = useState([]);
+  const [statusFilter, setStatusFilter] = useState([]);
+  const [flaggedOnly, setFlaggedOnly] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [pinnedTaskId, setPinnedTaskId] = useState(null);
-  const [zoomKey, setZoomKey] = useState("fit");
+  const [zoomKey, setZoomKey] = useState(() => {
+    if (typeof window === "undefined") return "fit";
+    const saved = window.localStorage.getItem(ZOOM_STORAGE_KEY);
+    return ZOOM_LEVELS.some((level) => level.key === saved) ? saved : "fit";
+  });
   const [undo, setUndo] = useState(null);
   const [selectedHubTaskId, setSelectedHubTaskId] = useState(null);
   const [selectedHubEmployeeId, setSelectedHubEmployeeId] = useState(null);
@@ -740,6 +747,52 @@ export default function App() {
     };
   }, [zoom]);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(ZOOM_STORAGE_KEY, zoomKey);
+    }
+  }, [zoomKey]);
+
+  const matchFilters = useCallback(
+    (task) => {
+      if (filter.length && !filter.includes(task.bureau)) return false;
+      if (statusFilter.length && !statusFilter.includes(task.status || "Planned")) return false;
+      if (flaggedOnly && getOpenFlags(task).length === 0) return false;
+      return true;
+    },
+    [filter, statusFilter, flaggedOnly]
+  );
+
+  const toggleStatusFilter = useCallback((value) => {
+    setStatusFilter((current) =>
+      current.includes(value)
+        ? current.filter((entry) => entry !== value)
+        : [...current, value]
+    );
+  }, []);
+
+  const shiftTask = useCallback((task, deltaDays) => {
+    const start = parseIsoDate(task.startDate);
+    const end = parseIsoDate(task.endDate);
+    if (!start || !end) return;
+    const duration = end.getTime() - start.getTime();
+    const minMs = timelineStartDate.getTime();
+    const maxMs = timelineEndDate.getTime();
+    let startMs = start.getTime() + deltaDays * MS_PER_DAY;
+    if (startMs < minMs) startMs = minMs;
+    let endMs = startMs + duration;
+    if (endMs > maxMs) {
+      endMs = maxMs;
+      startMs = Math.max(minMs, endMs - duration);
+    }
+    const nextStart = toIsoDate(new Date(startMs));
+    const nextEnd = toIsoDate(new Date(endMs));
+    if (nextStart === task.startDate && nextEnd === task.endDate) return;
+    const prev = { startDate: task.startDate, endDate: task.endDate };
+    storeUpdateTask(task.id, { startDate: nextStart, endDate: nextEnd });
+    showUndo(task.id, `Shifted "${task.task}"`, prev);
+  }, [showUndo]);
+
   const shellRef = useRef(null);
   const hoverDetailsRef = useRef(null);
   const hoverPointRef = useRef(null);
@@ -769,6 +822,8 @@ export default function App() {
 
   const clearFilter = useCallback(() => {
     setFilter([]);
+    setStatusFilter([]);
+    setFlaggedOnly(false);
   }, []);
 
   const bureauOptions = useMemo(
@@ -813,9 +868,8 @@ export default function App() {
   });
 
   const visibleTasks = useMemo(
-    () =>
-      filter.length === 0 ? tasks : tasks.filter((task) => filter.includes(task.bureau)),
-    [tasks, filter]
+    () => tasks.filter(matchFilters),
+    [tasks, matchFilters]
   );
 
   const assignmentHub = useMemo(() => {
@@ -976,12 +1030,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (activeTask && filter.length > 0 && !filter.includes(activeTask.bureau)) {
+    if (activeTask && !matchFilters(activeTask)) {
       setActiveTaskId(null);
       setPinnedTaskId(null);
       hoverPointRef.current = null;
     }
-  }, [activeTask, filter]);
+  }, [activeTask, matchFilters]);
 
   useEffect(() => {
     const handleKey = (event) => {
@@ -1188,30 +1242,62 @@ export default function App() {
 
         <section className="toolbar">
           <div className="controls card">
-            <div className="legend-bar">
-              <button
-                type="button"
-                className={`legend-chip filter ${filter.length === 0 ? "active" : ""}`}
-                onClick={clearFilter}
-                aria-pressed={filter.length === 0}
-              >
-                <span className="swatch swatch-all" />
-                All
-              </button>
-              {filterOptions
-                .filter((value) => value !== "All")
-                .map((value) => (
+            <div className="filter-group">
+              <span className="filter-group-label">Bureau</span>
+              <div className="legend-bar">
+                <button
+                  type="button"
+                  className={`legend-chip filter ${filter.length === 0 ? "active" : ""}`}
+                  onClick={() => setFilter([])}
+                  aria-pressed={filter.length === 0}
+                >
+                  <span className="swatch swatch-all" />
+                  All
+                </button>
+                {filterOptions
+                  .filter((value) => value !== "All")
+                  .map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`legend-chip filter ${filter.includes(value) ? "active" : ""}`}
+                      onClick={() => toggleFilter(value)}
+                      aria-pressed={filter.includes(value)}
+                    >
+                      <span className="swatch" style={{ background: bureauColor(value) }} />
+                      {bureauStyles[value]?.label || value}
+                    </button>
+                  ))}
+              </div>
+            </div>
+            <div className="filter-group">
+              <span className="filter-group-label">Status</span>
+              <div className="legend-bar">
+                {TASK_STATUSES.map((value) => (
                   <button
                     key={value}
                     type="button"
-                    className={`legend-chip filter ${filter.includes(value) ? "active" : ""}`}
-                    onClick={() => toggleFilter(value)}
-                    aria-pressed={filter.includes(value)}
+                    className={`legend-chip filter ${statusFilter.includes(value) ? "active" : ""}`}
+                    onClick={() => toggleStatusFilter(value)}
+                    aria-pressed={statusFilter.includes(value)}
                   >
-                    <span className="swatch" style={{ background: bureauColor(value) }} />
-                    {bureauStyles[value]?.label || value}
+                    {value}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  className={`legend-chip filter ${flaggedOnly ? "active" : ""}`}
+                  onClick={() => setFlaggedOnly((value) => !value)}
+                  aria-pressed={flaggedOnly}
+                >
+                  ⚑ Flagged only
+                </button>
+                {(filter.length || statusFilter.length || flaggedOnly) ? (
+                  <button type="button" className="secondary-btn filter-reset" onClick={clearFilter}>
+                    Reset filters
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
         </section>
@@ -1290,7 +1376,7 @@ export default function App() {
                     lane={lane}
                     laneIndex={laneIndex}
                     tasks={tasks}
-                    filter={filter}
+                    matchFilters={matchFilters}
                     activeTaskId={activeTaskId}
                     todayPosition={todayPosition}
                     onTaskHover={handleTaskHover}
@@ -1386,6 +1472,20 @@ export default function App() {
                       <div className="detail-label">Source</div>
                       <div className="detail-value">{activeTask.source}</div>
                     </div>
+                    {pinnedTaskId === activeTask.id ? (
+                      <div className="detail-block">
+                        <div className="detail-label">Quick reschedule</div>
+                        <div className="reschedule-row">
+                          <button type="button" className="secondary-btn" onClick={() => shiftTask(activeTask, -7)}>
+                            ◀ 1 week
+                          </button>
+                          <button type="button" className="secondary-btn" onClick={() => shiftTask(activeTask, 7)}>
+                            1 week ▶
+                          </button>
+                          <span className="note reschedule-note">Use Edit Work Item for exact dates.</span>
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="detail-block">
                       <div className="detail-label">Flags</div>
                       <TaskFlags task={activeTask} compact />
