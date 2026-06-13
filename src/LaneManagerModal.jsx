@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { addLane, moveLane, removeLane, renameLane, reorderLane } from "./taskStore";
+import HelpLink from "./HelpLink";
 
 function LaneRow({
   lane,
@@ -197,7 +198,10 @@ export default function LaneManagerModal({ open, lanes, onClose }) {
       >
         <div className="modal-header">
           <h3>Manage swim lanes</h3>
-          <button className="secondary-btn" type="button" onClick={onClose}>Close</button>
+          <div className="action-group">
+            <HelpLink section="lanes" />
+            <button className="secondary-btn" type="button" onClick={onClose}>Close</button>
+          </div>
         </div>
 
         <p className="note">

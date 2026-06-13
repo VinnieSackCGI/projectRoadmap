@@ -22,6 +22,7 @@ import {
   titleCase
 } from "./workItemUtils";
 import useWorkItemEditor from "./useWorkItemEditor";
+import HelpLink from "./HelpLink";
 import backgroundImage from "../design/dos wave background.jpg";
 
 const RISK_RANK = { Low: 0, Medium: 1, High: 2 };
@@ -244,6 +245,7 @@ export default function TasksPage() {
               <h2>Work Register</h2>
             </div>
             <div className="task-page-actions">
+              <HelpLink section="work-items" />
               <button type="button" className="primary-btn" onClick={openCreateEditor}>
                 Add Work Item
               </button>

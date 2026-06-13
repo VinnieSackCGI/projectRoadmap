@@ -33,6 +33,7 @@ import {
 } from "./taskStore";
 import TaskFlags from "./TaskFlags";
 import LaneManagerModal from "./LaneManagerModal";
+import HelpLink from "./HelpLink";
 import {
   createEmptyWorkItemDraft,
   formatDateLabel,
@@ -1374,6 +1375,7 @@ export default function App() {
               <h2>Roadmap</h2>
             </div>
             <div className="roadmap-header-actions">
+              <HelpLink section="roadmap" />
               <div className="zoom-controls" role="group" aria-label="Timeline zoom">
                 <span className="zoom-label">Zoom</span>
                 {ZOOM_LEVELS.map((level) => (

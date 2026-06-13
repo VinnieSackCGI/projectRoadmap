@@ -1,5 +1,5 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import AppHeader from "./AppHeader";
 import backgroundImage from "../design/dos wave background.jpg";
 
@@ -75,6 +75,16 @@ const SECTIONS = [
 ];
 
 export default function HelpPage() {
+  const { hash } = useLocation();
+
+  useEffect(() => {
+    if (!hash) return;
+    const target = document.getElementById(hash.slice(1));
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [hash]);
+
   return (
     <div className="app-root" style={{ "--roadmap-bg-image": `url(${backgroundImage})` }}>
       <AppHeader />

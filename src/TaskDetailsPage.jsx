@@ -17,6 +17,7 @@ import {
 } from "./taskStore";
 import TaskFlags from "./TaskFlags";
 import TaskDocuments from "./TaskDocuments";
+import HelpLink from "./HelpLink";
 import {
   createEmptyWorkItemDraft,
   formatDateLabel,
@@ -377,6 +378,7 @@ export default function TaskDetailsPage() {
                 </button>
                 <Link className="secondary-btn inline-action" to="/tasks">Back to Tasks</Link>
                 <Link className="primary-btn inline-action" to="/">Open Roadmap</Link>
+                <HelpLink section="details" />
               </div>
             </>
           )}

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import AppHeader from "./AppHeader";
 import { assessStaffBurnout, assessTaskRisk, useStaffing, useTasks } from "./taskStore";
 import { formatDateLabel } from "./workItemUtils";
+import HelpLink from "./HelpLink";
 import backgroundImage from "../design/dos wave background.jpg";
 
 function healthClass(level) {
@@ -106,6 +107,7 @@ export default function ExecutiveDashboardPage() {
               <Link className="primary-btn inline-action" to="/">Open Roadmap</Link>
               <Link className="filter-button" to="/tasks">Open Task Register</Link>
               <Link className="filter-button" to="/staffing">Open Staffing View</Link>
+              <HelpLink section="staffing" />
             </div>
           </article>
 
