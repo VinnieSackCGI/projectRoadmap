@@ -35,7 +35,7 @@ import {
   toIsoDate,
 } from "./workItemUtils";
 import useWorkItemEditor from "./useWorkItemEditor";
-import backgroundImage from "../dos wave background.jpg";
+import backgroundImage from "../design/dos wave background.jpg";
 import "./App.css";
 
 const TASK_ROW_HEIGHT = 112;

@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import logoWhite from "../dos-flag-seal-logo-horizontal-color-whitetext.png";
+import logoWhite from "../design/dos-flag-seal-logo-horizontal-color-whitetext.png";
 
 const NAV_ITEMS = [
   { to: "/", label: "Roadmap", end: true },

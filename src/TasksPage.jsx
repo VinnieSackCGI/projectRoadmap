@@ -18,7 +18,7 @@ import {
   titleCase
 } from "./workItemUtils";
 import useWorkItemEditor from "./useWorkItemEditor";
-import backgroundImage from "../dos wave background.jpg";
+import backgroundImage from "../design/dos wave background.jpg";
 
 function sortTasks(tasks) {
   return [...tasks].sort((a, b) => {

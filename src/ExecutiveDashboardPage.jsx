@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import AppHeader from "./AppHeader";
 import { assessStaffBurnout, assessTaskRisk, useStaffing, useTasks } from "./taskStore";
 import { formatDateLabel } from "./workItemUtils";
-import backgroundImage from "../dos wave background.jpg";
+import backgroundImage from "../design/dos wave background.jpg";
 
 function healthClass(level) {
   if (level === "Critical") return "health-pill critical";

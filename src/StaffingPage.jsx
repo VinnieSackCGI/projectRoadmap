@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import AppHeader from "./AppHeader";
 import { assessStaffBurnout, useStaffing, useTasks } from "./taskStore";
-import backgroundImage from "../dos wave background.jpg";
+import backgroundImage from "../design/dos wave background.jpg";
 
 function burnoutClass(level) {
   const value = (level || "").toLowerCase();
