@@ -3,13 +3,6 @@ import AppHeader from "./AppHeader";
 import { assessStaffBurnout, useStaffing, useTasks } from "./taskStore";
 import backgroundImage from "../design/dos wave background.jpg";
 
-function burnoutClass(level) {
-  const value = (level || "").toLowerCase();
-  if (value === "overloaded") return "burnout-card level-overloaded";
-  if (value === "stretched") return "burnout-card level-stretched";
-  return "burnout-card";
-}
-
 function levelTone(level) {
   const value = (level || "").toLowerCase();
   if (value === "overloaded") return "overloaded";
@@ -96,8 +89,7 @@ export default function StaffingPage() {
           <h2>Staffing capacity and burnout signals</h2>
           <p className="note">
             Capacity values are seed estimates. The burnout level is derived from declared
-            allocation and active task ownership; the agent reads the same signal via
-            window.projectRoadmap.assessBurnout().
+            allocation and active task ownership across the roadmap.
           </p>
 
           <div className="staffing-summary-grid">
@@ -173,34 +165,16 @@ export default function StaffingPage() {
                         Capacity {person.weeklyCapacityHours}h/week
                         {person.reasons.length ? ` · ${person.reasons.join("; ")}` : ""}
                       </span>
+                      {person.recommendation ? (
+                        <span className="burnout-meta staff-recommendation">
+                          Recommendation: {person.recommendation}
+                        </span>
+                      ) : null}
                     </div>
                   </article>
                 );
               })}
             </div>
-          </div>
-
-          <div className="staffing-grid">
-            {staffing.map((person) => {
-              const signal = burnoutByPerson[person.person];
-              return (
-                <div className={burnoutClass(signal?.level)} key={person.person}>
-                  <div className="staff-name">{person.person}</div>
-                  <div className="staff-role">{person.role}</div>
-                  <div className="detail-value">{person.focus}</div>
-                  <div className="burnout-meta">
-                    {person.allocationPercent}% declared ·
-                    {" "}{signal?.activeTaskCount ?? 0} active task(s) ·
-                    {" "}{signal?.totalEstimatedHours ?? 0}h estimated
-                  </div>
-                  <div className="burnout-meta">
-                    Status: <strong>{signal?.level || "Healthy"}</strong>
-                    {signal?.reasons?.length ? ` — ${signal.reasons.join("; ")}` : ""}
-                  </div>
-                  <p className="note">{person.recommendation}</p>
-                </div>
-              );
-            })}
           </div>
         </section>
       </main>

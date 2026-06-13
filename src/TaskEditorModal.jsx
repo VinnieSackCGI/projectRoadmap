@@ -281,7 +281,7 @@ export default function TaskEditorModal({
               rows={4}
               value={draft.description || ""}
               onChange={(event) => onChange("description", event.target.value)}
-              placeholder="What this task covers, scope notes, context for the agent."
+              placeholder="What this work item covers, scope notes, and key context."
             />
           </label>
         </div>

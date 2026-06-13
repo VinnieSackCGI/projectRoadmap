@@ -128,7 +128,7 @@ export default function ExecutiveDashboardPage() {
                 {initiatives.map((initiative) => (
                 <article className="health-card" key={initiative.id}>
                   <div className="vision-item-header">
-                    <strong>{initiative.task}</strong>
+                    <Link className="table-link" to={`/tasks/${initiative.id}`}>{initiative.task}</Link>
                     <span className={healthClass(initiative.health)}>{initiative.health}</span>
                   </div>
                   <div className="detail-value">{initiative.bureau} · {initiative.lane}</div>
@@ -150,13 +150,13 @@ export default function ExecutiveDashboardPage() {
             <h2>Next Delivery Windows</h2>
             <div className="dashboard-list">
               {upcomingDeadlines.map((item) => (
-                <div className="dashboard-list-item" key={item.id}>
+                <Link className="dashboard-list-item" key={item.id} to={`/tasks/${item.id}`}>
                   <div>
                     <strong>{item.task}</strong>
                     <div className="detail-value">{item.bureau} · {item.lane}</div>
                   </div>
                   <div className="dashboard-list-meta">{formatDateLabel(item.dueDate)}</div>
-                </div>
+                </Link>
               ))}
             </div>
           </section>
@@ -166,13 +166,13 @@ export default function ExecutiveDashboardPage() {
             <h2>People Needing Attention</h2>
             <div className="dashboard-list">
               {flaggedPeople.length ? flaggedPeople.map((person) => (
-                <div className="dashboard-list-item" key={person.person}>
+                <Link className="dashboard-list-item" key={person.person} to="/staffing">
                   <div>
                     <strong>{person.person}</strong>
                     <div className="detail-value">{person.level}</div>
                   </div>
                   <div className="dashboard-list-meta">{person.declaredAllocationPercent}%</div>
-                </div>
+                </Link>
               )) : (
                 <p className="note">No stretched or overloaded staffing signals are active.</p>
               )}
@@ -184,13 +184,13 @@ export default function ExecutiveDashboardPage() {
             <h2>Projects At Risk</h2>
             <div className="dashboard-list">
               {criticalProjects.length ? criticalProjects.map((item) => (
-                <div className="dashboard-list-item" key={item.id}>
+                <Link className="dashboard-list-item" key={item.id} to={`/tasks/${item.id}`}>
                   <div>
                     <strong>{item.task}</strong>
                     <div className="detail-value">{item.health}</div>
                   </div>
                   <div className="dashboard-list-meta">{item.bureau}</div>
-                </div>
+                </Link>
               )) : (
                 <p className="note">No current yellow or red initiatives are detected.</p>
               )}

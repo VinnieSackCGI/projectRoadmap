@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AppHeader from "./AppHeader";
 import TaskEditorModal from "./TaskEditorModal";
@@ -7,6 +7,8 @@ import {
   assessTaskRisk,
   createTask as storeCreateTask,
   deleteTask as storeDeleteTask,
+  exportRoadmap,
+  importRoadmap,
   resolveTaskOwners,
   updateTask as storeUpdateTask,
   useStaffing,
@@ -20,16 +22,32 @@ import {
 import useWorkItemEditor from "./useWorkItemEditor";
 import backgroundImage from "../design/dos wave background.jpg";
 
-function sortTasks(tasks) {
-  return [...tasks].sort((a, b) => {
-    if (a.startDate !== b.startDate) {
-      return (a.startDate || "").localeCompare(b.startDate || "");
+const RISK_RANK = { Low: 0, Medium: 1, High: 2 };
+
+function sortValue(task, key) {
+  switch (key) {
+    case "name":
+      return (task.task || "").toLowerCase();
+    case "type":
+      return (task.entityType || "").toLowerCase();
+    case "owners": {
+      const { staff, external } = resolveTaskOwners(task);
+      return [...staff.map((p) => p.person), ...external].join(", ").toLowerCase();
     }
-    if (a.lane !== b.lane) {
-      return a.lane.localeCompare(b.lane);
-    }
-    return a.task.localeCompare(b.task);
-  });
+    case "bureau":
+      return (task.bureau || "").toLowerCase();
+    case "lane":
+      return (task.lane || "").toLowerCase();
+    case "due":
+      return task.dueDate || "";
+    case "status":
+      return (task.status || "Planned").toLowerCase();
+    case "risk":
+      return RISK_RANK[assessTaskRisk(task).level] ?? 0;
+    case "window":
+    default:
+      return task.startDate || "";
+  }
 }
 
 function statusClass(status) {
@@ -76,6 +94,47 @@ export default function TasksPage() {
   );
 
   const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const [sort, setSort] = useState({ key: "window", dir: "asc" });
+  const fileInputRef = useRef(null);
+
+  const toggleSort = useCallback((key) => {
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: "asc" }
+    );
+  }, []);
+
+  const handleExport = useCallback(() => {
+    const blob = new Blob([JSON.stringify(exportRoadmap(), null, 2)], {
+      type: "application/json"
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `roadmap-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleImportFile = useCallback((event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const payload = JSON.parse(String(reader.result));
+        if (!importRoadmap(payload)) {
+          window.alert("That file did not contain a valid roadmap backup.");
+        }
+      } catch {
+        window.alert("Could not read that file as JSON.");
+      }
+    };
+    reader.readAsText(file);
+  }, []);
+
   const {
     closeEditor,
     deleteDraftTask,
@@ -101,7 +160,7 @@ export default function TasksPage() {
     const normalizedTask = filters.task.trim().toLowerCase();
     const normalizedOwners = filters.owners.trim().toLowerCase();
 
-    return sortTasks(tasks).filter((task) => {
+    return tasks.filter((task) => {
       const risk = assessTaskRisk(task);
       const { staff, external } = resolveTaskOwners(task);
       const ownerLabel = [
@@ -151,6 +210,17 @@ export default function TasksPage() {
     });
   }, [filters, tasks]);
 
+  const sortedTasks = useMemo(() => {
+    const dir = sort.dir === "desc" ? -1 : 1;
+    return [...filteredTasks].sort((a, b) => {
+      const va = sortValue(a, sort.key);
+      const vb = sortValue(b, sort.key);
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return (a.task || "").localeCompare(b.task || "");
+    });
+  }, [filteredTasks, sort]);
+
   const updateFilter = useCallback((field, value) => {
     setFilters((previous) => ({ ...previous, [field]: value }));
   }, []);
@@ -167,7 +237,7 @@ export default function TasksPage() {
         <section className="card page-panel">
           <div className="task-page-header">
             <div>
-              <div className="section-title">Task Register</div>
+              <div className="section-title">Work Items</div>
               <h2>Work Register</h2>
             </div>
             <div className="task-page-actions">
@@ -177,28 +247,69 @@ export default function TasksPage() {
               <button type="button" className="secondary-btn" onClick={clearFilters}>
                 Clear Filters
               </button>
+              <button type="button" className="secondary-btn" onClick={handleExport}>
+                Export
+              </button>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Import
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/json,.json"
+                className="visually-hidden-input"
+                onChange={handleImportFile}
+              />
             </div>
           </div>
           <p className="note">
-            Live portfolio register across projects, epics, and tasks. Status, priority, and risk
-            are populated from the shared store and exposed to the in-page agent via window.projectRoadmap.
+            Live portfolio register across projects, epics, and tasks. Click a column heading to
+            sort. Use Export to download a local backup, or Import to restore one.
           </p>
           <p className="note task-count-note">
-            Showing {filteredTasks.length} of {tasks.length} work items.
+            Showing {sortedTasks.length} of {tasks.length} work items.
           </p>
           <div className="table-wrap">
             <table className="task-table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Owners</th>
-                  <th>Bureau</th>
-                  <th>Swim lane</th>
-                  <th>Window</th>
-                  <th>Due</th>
-                  <th>Status</th>
-                  <th>Risk</th>
+                  {[
+                    { key: "name", label: "Name" },
+                    { key: "type", label: "Type" },
+                    { key: "owners", label: "Owners" },
+                    { key: "bureau", label: "Bureau" },
+                    { key: "lane", label: "Swim lane" },
+                    { key: "window", label: "Window" },
+                    { key: "due", label: "Due" },
+                    { key: "status", label: "Status" },
+                    { key: "risk", label: "Risk" }
+                  ].map((column) => (
+                    <th
+                      key={column.key}
+                      aria-sort={
+                        sort.key === column.key
+                          ? sort.dir === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
+                    >
+                      <button
+                        type="button"
+                        className={`th-sort ${sort.key === column.key ? "active" : ""}`}
+                        onClick={() => toggleSort(column.key)}
+                      >
+                        {column.label}
+                        <span className="th-sort-arrow" aria-hidden="true">
+                          {sort.key === column.key ? (sort.dir === "asc" ? "▲" : "▼") : "↕"}
+                        </span>
+                      </button>
+                    </th>
+                  ))}
                   <th>Actions</th>
                 </tr>
                 <tr className="task-filter-row">
@@ -308,13 +419,13 @@ export default function TasksPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredTasks.length === 0 ? (
+                {sortedTasks.length === 0 ? (
                   <tr>
                     <td className="task-empty-cell" colSpan={10}>
                       No work items match the current filters.
                     </td>
                   </tr>
-                ) : filteredTasks.map((task) => {
+                ) : sortedTasks.map((task) => {
                   const risk = assessTaskRisk(task);
                   const { staff, external } = resolveTaskOwners(task);
                   const ownerLabel = [

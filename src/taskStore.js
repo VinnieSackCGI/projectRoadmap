@@ -552,6 +552,80 @@ export function replaceStaffing(next) {
   emit();
 }
 
+// --- Task flags (At Risk / Scope Unclear) ---
+
+export function getOpenFlags(task) {
+  return (Array.isArray(task?.flags) ? task.flags : []).filter(
+    (flag) => flag && flag.status !== "resolved"
+  );
+}
+
+export function addTaskFlag(taskId, flag = {}) {
+  const task = getTask(taskId);
+  if (!task) return null;
+  const entry = {
+    id: generateId("flag"),
+    type: flag.type || "At Risk",
+    note: (flag.note || "").trim(),
+    status: "open",
+    createdAt: new Date().toISOString(),
+    createdBy: flag.createdBy || "Current user",
+    resolutionNote: "",
+    resolvedAt: null,
+    resolvedBy: null
+  };
+  const flags = Array.isArray(task.flags) ? task.flags : [];
+  return updateTask(taskId, { flags: [...flags, entry] });
+}
+
+export function resolveTaskFlag(taskId, flagId, resolutionNote, resolvedBy = "Current user") {
+  const task = getTask(taskId);
+  if (!task) return null;
+  const note = (resolutionNote || "").trim();
+  // A resolution note is required — no silent close.
+  if (!note) return null;
+  const flags = (Array.isArray(task.flags) ? task.flags : []).map((flag) =>
+    flag.id === flagId
+      ? {
+          ...flag,
+          status: "resolved",
+          resolutionNote: note,
+          resolvedAt: new Date().toISOString(),
+          resolvedBy
+        }
+      : flag
+  );
+  return updateTask(taskId, { flags });
+}
+
+// --- Local backup: export / import the whole roadmap ---
+
+export function exportRoadmap() {
+  return {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    tasks: getTasks(),
+    staffing: getStaffing()
+  };
+}
+
+export function importRoadmap(payload) {
+  if (!payload || typeof payload !== "object") return false;
+  const nextTasks = Array.isArray(payload.tasks) ? payload.tasks : null;
+  const nextStaffing = Array.isArray(payload.staffing) ? payload.staffing : null;
+  if (!nextTasks && !nextStaffing) return false;
+  if (nextTasks) {
+    tasksState = normalizeTaskCollection(nextTasks);
+    persistTasks();
+  }
+  if (nextStaffing) {
+    staffingState = nextStaffing;
+    persistStaffing();
+  }
+  emit();
+  return true;
+}
+
 // --- Risk + burnout heuristics (used by UI badges and by the PM agent) ---
 
 export function assessTaskRisk(task) {
@@ -721,6 +795,10 @@ if (typeof window !== "undefined") {
       return task ? resolveTaskOwners(task) : { staff: [], external: [] };
     },
     replaceStaffing,
+    addTaskFlag,
+    resolveTaskFlag,
+    exportRoadmap,
+    importRoadmap,
     assessTaskRisk: (idOrTask) => {
       const task = typeof idOrTask === "string" ? getTask(idOrTask) : idOrTask;
       return task ? assessTaskRisk(task) : null;

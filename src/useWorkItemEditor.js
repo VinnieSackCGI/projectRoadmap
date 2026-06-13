@@ -26,10 +26,16 @@ export default function useWorkItemEditor({
     [draft.projectId, tasks]
   );
 
-  const openCreateEditor = useCallback(() => {
+  const openCreateEditor = useCallback((seed) => {
+    // Guard against being used directly as an onClick handler (seed = event).
+    const isPlainSeed =
+      seed &&
+      typeof seed === "object" &&
+      !seed.nativeEvent &&
+      typeof seed.preventDefault !== "function";
     setEditorMode("create");
     setEditingTaskId(null);
-    setDraft(createEmptyDraft());
+    setDraft(isPlainSeed ? { ...createEmptyDraft(), ...seed } : createEmptyDraft());
     setValidationError("");
     setIsEditorOpen(true);
   }, [createEmptyDraft]);

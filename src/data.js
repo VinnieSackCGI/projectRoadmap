@@ -36,6 +36,8 @@ export const lanes = [
   }
 ];
 
+export const FLAG_TYPES = ["At Risk", "Scope Unclear"];
+
 export const TASK_STATUSES = ["Planned", "In Progress", "Blocked", "Done", "Cancelled"];
 export const TASK_PRIORITIES = ["Low", "Medium", "High", "Critical"];
 export const TASK_RISK_LEVELS = ["Low", "Medium", "High"];

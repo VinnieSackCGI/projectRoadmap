@@ -5,6 +5,7 @@ import TaskEditorModal from "./TaskEditorModal";
 import { bureauStyles, lanes } from "./data";
 import {
   assessTaskRisk,
+  createTask as storeCreateTask,
   deleteTask as storeDeleteTask,
   getSubtasks,
   resolveTaskOwners,
@@ -12,9 +13,11 @@ import {
   useStaffing,
   useTasks
 } from "./taskStore";
+import TaskFlags from "./TaskFlags";
 import {
   createEmptyWorkItemDraft,
   formatDateLabel,
+  parseIsoDate,
   titleCase
 } from "./workItemUtils";
 import useWorkItemEditor from "./useWorkItemEditor";
@@ -49,6 +52,55 @@ function rollupProgress(parent, subtasks) {
   return Math.round((weighted / totalWeight) * 100);
 }
 
+function miniStatusClass(status) {
+  const value = (status || "").toLowerCase();
+  if (value === "blocked") return "mini-bar-blocked";
+  if (value === "in progress") return "mini-bar-progress";
+  if (value === "done") return "mini-bar-done";
+  return "mini-bar-planned";
+}
+
+function SubtaskTimeline({ parent, subtasks }) {
+  const items = [parent, ...subtasks];
+  const starts = items.map((item) => parseIsoDate(item.startDate)).filter(Boolean);
+  const ends = items.map((item) => parseIsoDate(item.endDate)).filter(Boolean);
+  if (!starts.length || !ends.length) {
+    return null;
+  }
+  const winStart = Math.min(...starts.map((date) => date.getTime()));
+  const winEnd = Math.max(...ends.map((date) => date.getTime()));
+  const span = Math.max(1, winEnd - winStart);
+  const layout = (task) => {
+    const start = parseIsoDate(task.startDate)?.getTime() ?? winStart;
+    const end = parseIsoDate(task.endDate)?.getTime() ?? start;
+    const left = ((start - winStart) / span) * 100;
+    const width = Math.max(2, ((end - start) / span) * 100);
+    return { left, width: Math.min(width, 100 - left) };
+  };
+
+  return (
+    <div className="mini-roadmap">
+      {subtasks.map((sub) => {
+        const { left, width } = layout(sub);
+        return (
+          <div className="mini-row" key={sub.id}>
+            <Link className="mini-label table-link" to={`/tasks/${sub.id}`}>{sub.task}</Link>
+            <div className="mini-track">
+              <div
+                className={`mini-bar ${miniStatusClass(sub.status)}`}
+                style={{ left: `${left}%`, width: `${width}%` }}
+                title={`${formatDateLabel(sub.startDate)} – ${formatDateLabel(sub.endDate)}`}
+              >
+                <span>{sub.status || "Planned"}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function TaskDetailsPage() {
   const { taskId } = useParams();
   const navigate = useNavigate();
@@ -79,8 +131,10 @@ export default function TaskDetailsPage() {
     closeEditor,
     deleteDraftTask,
     draft,
+    editorMode,
     epicOptions,
     isEditorOpen,
+    openCreateEditor,
     openEditEditor,
     projectOptions,
     saveDraft,
@@ -89,13 +143,28 @@ export default function TaskDetailsPage() {
   } = useWorkItemEditor({
     tasks,
     createEmptyDraft,
-    onCreate: storeUpdateTask,
+    onCreate: storeCreateTask,
     onUpdate: storeUpdateTask,
     onDelete: (id) => {
       storeDeleteTask(id);
       navigate("/tasks");
     }
   });
+
+  const handleAddSubtask = useCallback(() => {
+    if (!task) return;
+    openCreateEditor({
+      entityType: "task",
+      lane: task.lane,
+      bureau: task.bureau,
+      projectId: task.projectId || (task.entityType === "project" ? task.id : null),
+      epicId: task.epicId || (task.entityType === "epic" ? task.id : null),
+      parentTaskId: task.id,
+      startDate: task.startDate,
+      endDate: task.endDate,
+      dueDate: task.dueDate || task.endDate
+    });
+  }, [openCreateEditor, task]);
 
   return (
     <div className="app-root" style={{ "--roadmap-bg-image": `url(${backgroundImage})` }}>
@@ -202,41 +271,69 @@ export default function TaskDetailsPage() {
                     )}
                   </div>
                 </div>
-                <div className="detail-block">
-                  <div className="detail-label">User group</div>
-                  <div className="detail-value">{task.userGroup || "Not specified"}</div>
-                </div>
-                <div className="detail-block">
-                  <div className="detail-label">App link</div>
-                  <div className="detail-value">
-                    {task.appLink ? (
-                      <a href={task.appLink} target="_blank" rel="noreferrer">{task.appLink}</a>
-                    ) : (
-                      "Not specified"
-                    )}
+                {task.userGroup ? (
+                  <div className="detail-block">
+                    <div className="detail-label">User group</div>
+                    <div className="detail-value">{task.userGroup}</div>
                   </div>
-                </div>
-                <div className="detail-block">
-                  <div className="detail-label">Milestone</div>
-                  <div className="detail-value">{task.milestone || "Not specified"}</div>
-                </div>
-                <div className="detail-block">
-                  <div className="detail-label">Confidence</div>
-                  <div className="detail-value">{task.confidence || "Not specified"}</div>
-                </div>
-                <div className="detail-block">
-                  <div className="detail-label">Source</div>
-                  <div className="detail-value">{task.source || "Not specified"}</div>
-                </div>
+                ) : null}
+                {task.appLink ? (
+                  <div className="detail-block">
+                    <div className="detail-label">App link</div>
+                    <div className="detail-value">
+                      <a href={task.appLink} target="_blank" rel="noreferrer">{task.appLink}</a>
+                    </div>
+                  </div>
+                ) : null}
+                {task.milestone ? (
+                  <div className="detail-block">
+                    <div className="detail-label">Milestone</div>
+                    <div className="detail-value">{task.milestone}</div>
+                  </div>
+                ) : null}
+                {task.confidence ? (
+                  <div className="detail-block">
+                    <div className="detail-label">Confidence</div>
+                    <div className="detail-value">{task.confidence}</div>
+                  </div>
+                ) : null}
+                {task.source ? (
+                  <div className="detail-block">
+                    <div className="detail-label">Source</div>
+                    <div className="detail-value">{task.source}</div>
+                  </div>
+                ) : null}
               </div>
 
-              {subtasks.length > 0 ? (
-                <>
+              {!task.userGroup || !task.appLink || !task.milestone || !task.description ? (
+                <p className="note add-details-hint">
+                  Some optional fields (description, app link, user group, milestone) are empty.{" "}
+                  <button type="button" className="link-btn" onClick={() => openEditEditor(task)}>
+                    Add details
+                  </button>
+                </p>
+              ) : null}
+
+              <div className="section-title" style={{ marginTop: 20 }}>Flags</div>
+              <h2>Risk & scope flags</h2>
+              <TaskFlags task={task} />
+
+              <div className="subtask-section-head">
+                <div>
                   <div className="section-title" style={{ marginTop: 20 }}>Subtasks</div>
                   <h2>
                     Child work
                     {progress !== null ? ` — ${progress}% rolled up` : ""}
                   </h2>
+                </div>
+                <button type="button" className="secondary-btn" onClick={handleAddSubtask}>
+                  Add subtask
+                </button>
+              </div>
+
+              {subtasks.length > 0 ? (
+                <>
+                  <SubtaskTimeline parent={task} subtasks={subtasks} />
                   <div className="table-wrap">
                     <table className="task-table">
                       <thead>
@@ -262,11 +359,13 @@ export default function TaskDetailsPage() {
                     </table>
                   </div>
                 </>
-              ) : null}
+              ) : (
+                <p className="note">No subtasks yet. Use “Add subtask” to break this work item down.</p>
+              )}
 
               <div className="page-actions">
-                <button type="button" className="primary-btn" onClick={openEditEditor}>
-                  Edit Task
+                <button type="button" className="primary-btn" onClick={() => openEditEditor(task)}>
+                  Edit Work Item
                 </button>
                 <Link className="secondary-btn inline-action" to="/tasks">Back to Tasks</Link>
                 <Link className="primary-btn inline-action" to="/">Open Roadmap</Link>
@@ -278,7 +377,7 @@ export default function TaskDetailsPage() {
 
       <TaskEditorModal
         open={isEditorOpen}
-        mode="edit"
+        mode={editorMode}
         draft={draft}
         lanes={lanes}
         bureauOptions={bureauOptions}
