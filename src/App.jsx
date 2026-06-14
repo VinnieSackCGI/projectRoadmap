@@ -39,6 +39,8 @@ import {
   formatDateLabel,
   normalizeDateString,
   parseIsoDate,
+  sortMilestones,
+  summarizeMilestones,
   toIsoDate,
 } from "./workItemUtils";
 import useWorkItemEditor from "./useWorkItemEditor";
@@ -344,6 +346,7 @@ function LaneTrack({
           const x = start * unitWidth + BAR_HORIZONTAL_INSET;
           const y = TASK_TOP_PADDING + rowIndex * TASK_ROW_HEIGHT;
           const openFlagCount = getOpenFlags(task).length;
+          const ms = summarizeMilestones(task);
 
           return (
             <Rnd
@@ -387,9 +390,21 @@ function LaneTrack({
                 }}
               >
                 <span className="task-bar-accent" aria-hidden="true" />
-                {openFlagCount > 0 ? (
-                  <span className="task-flag-badge" title={`${openFlagCount} open flag${openFlagCount === 1 ? "" : "s"}`}>
-                    ⚑ {openFlagCount}
+                {openFlagCount > 0 || ms.total > 0 ? (
+                  <span className="task-bar-badges">
+                    {ms.total > 0 ? (
+                      <span
+                        className={`task-ms-badge ${ms.overdue > 0 ? "is-overdue" : ""}`}
+                        title={`${ms.done}/${ms.total} milestones done${ms.overdue > 0 ? `, ${ms.overdue} overdue` : ""}`}
+                      >
+                        ◆ {ms.done}/{ms.total}
+                      </span>
+                    ) : null}
+                    {openFlagCount > 0 ? (
+                      <span className="task-flag-badge" title={`${openFlagCount} open flag${openFlagCount === 1 ? "" : "s"}`}>
+                        ⚑ {openFlagCount}
+                      </span>
+                    ) : null}
                   </span>
                 ) : null}
                 <span className="task-title">{task.task}</span>
@@ -1562,6 +1577,40 @@ export default function App() {
                         </div>
                       </div>
                     ) : null}
+                    <div className="detail-block">
+                      <div className="detail-label">Milestones</div>
+                      <div className="detail-value">
+                        {(() => {
+                          const list = sortMilestones(activeTask.milestones);
+                          if (list.length === 0) {
+                            return "None yet";
+                          }
+                          const todayIso = toIsoDate(new Date());
+                          return (
+                            <ul className="card-milestone-list">
+                              {list.map((milestone) => {
+                                const overdue =
+                                  !milestone.done && milestone.date && milestone.date < todayIso;
+                                return (
+                                  <li
+                                    key={milestone.id}
+                                    className={`card-milestone ${milestone.done ? "is-done" : ""} ${overdue ? "is-overdue" : ""}`}
+                                  >
+                                    <span className="card-ms-mark" aria-hidden="true">
+                                      {milestone.done ? "✓" : "◆"}
+                                    </span>
+                                    <span className="card-ms-title">{milestone.title}</span>
+                                    <span className="card-ms-date">
+                                      {milestone.date ? formatDateLabel(milestone.date) : "—"}
+                                    </span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          );
+                        })()}
+                      </div>
+                    </div>
                     <div className="detail-block">
                       <div className="detail-label">Flags</div>
                       <TaskFlags task={activeTask} compact />

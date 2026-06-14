@@ -2283,6 +2283,182 @@ a.dashboard-list-item:hover {
   box-shadow: 0 10px 24px rgba(43, 37, 27, 0.14), 0 0 0 2px rgba(197, 64, 63, 0.5);
 }
 
+/* --- Roadmap bar badges (milestones + flags) --- */
+.task-bar-badges {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.task-ms-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(27, 34, 48, 0.78);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.task-ms-badge.is-overdue {
+  background: rgba(208, 138, 43, 0.95);
+}
+
+/* --- Pinned card milestone list --- */
+.card-milestone-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.card-milestone {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.9rem;
+}
+
+.card-ms-mark {
+  color: var(--accent);
+}
+
+.card-milestone.is-done .card-ms-title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.card-milestone.is-done .card-ms-mark {
+  color: #0d6b59;
+}
+
+.card-milestone.is-overdue .card-ms-mark,
+.card-milestone.is-overdue .card-ms-date {
+  color: #9a5805;
+  font-weight: 700;
+}
+
+.card-ms-date {
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+/* --- Milestones panel (details page) --- */
+.milestones-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.milestone-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.milestone-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(76, 80, 97, 0.14);
+}
+
+.milestone-item.is-overdue {
+  border-color: rgba(208, 138, 43, 0.5);
+  background: rgba(208, 138, 43, 0.08);
+}
+
+.milestone-item.is-done {
+  opacity: 0.7;
+}
+
+.milestone-item.is-done .milestone-title-input {
+  text-decoration: line-through;
+}
+
+.milestone-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  padding: 6px 8px;
+}
+
+.milestone-title-input:hover,
+.milestone-title-input:focus {
+  border-color: rgba(88, 80, 62, 0.22);
+  background: #fffdf8;
+}
+
+.milestone-date-input {
+  flex: none;
+  border: 1px solid rgba(88, 80, 62, 0.22);
+  border-radius: 8px;
+  background: #fffdf8;
+  color: var(--ink);
+  font: inherit;
+  padding: 6px 8px;
+}
+
+.milestone-overdue-chip {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(208, 138, 43, 0.16);
+  color: #9a5805;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.milestone-remove {
+  flex: none;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+}
+
+.milestone-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.milestone-add input[type="text"] {
+  flex: 1 1 200px;
+  min-width: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(88, 80, 62, 0.22);
+  background: #fffdf8;
+  color: var(--ink);
+  font: inherit;
+  padding: 9px 11px;
+}
+
+.milestone-add input[type="date"] {
+  border-radius: 10px;
+  border: 1px solid rgba(88, 80, 62, 0.22);
+  background: #fffdf8;
+  color: var(--ink);
+  font: inherit;
+  padding: 9px 11px;
+}
+
 /* --- Pinned hover-detail header + close --- */
 .hover-details-head {
   display: flex;

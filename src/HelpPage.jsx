@@ -50,6 +50,7 @@ const SECTIONS = [
     steps: [
       ["Open", "Click a work item’s name anywhere, or “Open Details” from the pinned roadmap card."],
       ["Edit", "Use Edit Work Item to change any field. Empty optional fields are hidden with an “Add details” shortcut."],
+      ["Milestones", "Add dated milestones or checkpoints and tick them off as they’re met. Open, past-due milestones are flagged Overdue, count toward the item’s risk, and show as a ◆ badge on the roadmap bar."],
       ["Subtasks", "Add subtasks (they inherit the parent’s context). A mini-roadmap shows their timing, and parent progress rolls up from subtask effort estimates."],
       ["Flags", "Raise an At Risk or Scope Unclear flag with a short comment. Resolving a flag requires a resolution note."],
       ["Documents", "Attach files (stored locally for the pilot, up to 3 MB each). Anyone can download or remove them in this pilot build."]

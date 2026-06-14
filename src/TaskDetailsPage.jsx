@@ -17,6 +17,7 @@ import {
 } from "./taskStore";
 import TaskFlags from "./TaskFlags";
 import TaskDocuments from "./TaskDocuments";
+import MilestonesPanel from "./MilestonesPanel";
 import HelpLink from "./HelpLink";
 import {
   createEmptyWorkItemDraft,
@@ -264,12 +265,6 @@ export default function TaskDetailsPage() {
                     </div>
                   </div>
                 ) : null}
-                {task.milestone ? (
-                  <div className="detail-block">
-                    <div className="detail-label">Milestone</div>
-                    <div className="detail-value">{task.milestone}</div>
-                  </div>
-                ) : null}
                 {task.confidence ? (
                   <div className="detail-block">
                     <div className="detail-label">Confidence</div>
@@ -284,14 +279,18 @@ export default function TaskDetailsPage() {
                 ) : null}
               </div>
 
-              {!task.userGroup || !task.appLink || !task.milestone || !task.description ? (
+              {!task.userGroup || !task.appLink || !task.description ? (
                 <p className="note add-details-hint">
-                  Some optional fields (description, app link, user group, milestone) are empty.{" "}
+                  Some optional fields (description, app link, user group) are empty.{" "}
                   <button type="button" className="link-btn" onClick={() => openEditEditor(task)}>
                     Add details
                   </button>
                 </p>
               ) : null}
+
+              <div className="section-title" style={{ marginTop: 20 }}>Milestones</div>
+              <h2>Milestones &amp; checkpoints</h2>
+              <MilestonesPanel task={task} />
 
               <div className="section-title" style={{ marginTop: 20 }}>Flags</div>
               <h2>Risk & scope flags</h2>

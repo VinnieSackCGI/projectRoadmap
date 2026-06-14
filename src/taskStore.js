@@ -23,6 +23,7 @@ const STAFF_KEY = "project-roadmap-staffing-v2";
 const LANES_KEY = "project-roadmap-lanes-v1";
 const LEGACY_TASKS_KEY = "regional-planning-react-tasks-v1";
 const ROADMAP_DATE_SYNC_KEY = "project-roadmap-date-sync-v1";
+const MILESTONE_SEED_KEY = "project-roadmap-milestone-seed-v1";
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const VALID_ENTITY_TYPES = new Set(TASK_ENTITY_TYPES);
 
@@ -498,8 +499,39 @@ function emit() {
   listeners.forEach((fn) => fn());
 }
 
+// One-time migration: turn each item's legacy `milestone` headline into a
+// structured milestone so the new milestone list isn't empty on first run.
+function maybeSeedMilestones(tasks) {
+  if (typeof window === "undefined") return tasks;
+  if (window.localStorage.getItem(MILESTONE_SEED_KEY)) return tasks;
+
+  let changed = false;
+  const seeded = tasks.map((task) => {
+    const list = Array.isArray(task.milestones) ? task.milestones : [];
+    if (list.length === 0 && task.milestone) {
+      changed = true;
+      return {
+        ...task,
+        milestones: [
+          {
+            id: generateId("ms"),
+            title: task.milestone,
+            date: task.dueDate || task.endDate || "",
+            done: false
+          }
+        ]
+      };
+    }
+    return task;
+  });
+
+  if (changed) safeSetItem(TASKS_KEY, JSON.stringify(seeded));
+  window.localStorage.setItem(MILESTONE_SEED_KEY, "1");
+  return changed ? seeded : tasks;
+}
+
 lanesState = loadLanesFromStorage();
-tasksState = loadTasksFromStorage();
+tasksState = maybeSeedMilestones(loadTasksFromStorage());
 staffingState = loadStaffingFromStorage();
 
 if (typeof window !== "undefined") {
@@ -771,6 +803,39 @@ export function removeTaskDocument(taskId, docId) {
   return updateTask(taskId, { documents });
 }
 
+// --- Milestones ---
+
+export function addMilestone(taskId, { title, date } = {}) {
+  const task = getTask(taskId);
+  if (!task) return null;
+  const entry = {
+    id: generateId("ms"),
+    title: (title || "").trim() || "Milestone",
+    date: date || "",
+    done: false
+  };
+  const list = Array.isArray(task.milestones) ? task.milestones : [];
+  return updateTask(taskId, { milestones: [...list, entry] });
+}
+
+export function updateMilestone(taskId, milestoneId, patch = {}) {
+  const task = getTask(taskId);
+  if (!task) return null;
+  const list = (Array.isArray(task.milestones) ? task.milestones : []).map((milestone) =>
+    milestone.id === milestoneId ? { ...milestone, ...patch } : milestone
+  );
+  return updateTask(taskId, { milestones: list });
+}
+
+export function removeMilestone(taskId, milestoneId) {
+  const task = getTask(taskId);
+  if (!task) return null;
+  const list = (Array.isArray(task.milestones) ? task.milestones : []).filter(
+    (milestone) => milestone.id !== milestoneId
+  );
+  return updateTask(taskId, { milestones: list });
+}
+
 // --- Risk + burnout heuristics (used by UI badges and by the PM agent) ---
 
 export function assessTaskRisk(task) {
@@ -812,6 +877,15 @@ export function assessTaskRisk(task) {
   if (spanDays > 365 && status !== "done") {
     score += 1;
     reasons.push("Spans more than one year");
+  }
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const overdueMilestones = (Array.isArray(task.milestones) ? task.milestones : []).filter(
+    (milestone) => !milestone.done && milestone.date && milestone.date < todayIso
+  ).length;
+  if (overdueMilestones > 0 && status !== "done") {
+    score += 1;
+    reasons.push(`${overdueMilestones} overdue milestone${overdueMilestones === 1 ? "" : "s"}`);
   }
 
   let level = "Low";
@@ -933,6 +1007,9 @@ if (typeof window !== "undefined") {
     resolveTaskFlag,
     addTaskDocument,
     removeTaskDocument,
+    addMilestone,
+    updateMilestone,
+    removeMilestone,
     listLanes: () => getLanes().map((lane) => ({ ...lane })),
     addLane,
     renameLane,

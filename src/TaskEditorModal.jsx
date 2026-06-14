@@ -200,16 +200,6 @@ export default function TaskEditorModal({
           </label>
 
           <label>
-            Milestone summary
-            <input
-              type="text"
-              value={draft.milestone || ""}
-              onChange={(event) => onChange("milestone", event.target.value)}
-              placeholder="Headline milestone"
-            />
-          </label>
-
-          <label>
             Confidence
             <input
               type="text"
