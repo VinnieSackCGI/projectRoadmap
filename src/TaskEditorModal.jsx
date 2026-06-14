@@ -47,6 +47,12 @@ export default function TaskEditorModal({
           <button className="secondary-btn" type="button" onClick={onCancel}>Close</button>
         </div>
 
+        <p className="modal-grid-full editor-hint note">
+          Type is just a grouping: a <strong>Project</strong> can contain <strong>Epics</strong>,
+          which can contain <strong>Tasks</strong>. Linking to a project or epic is optional — leave
+          it blank for a standalone item.
+        </p>
+
         <div className="modal-grid">
           <label>
             Item type
@@ -72,12 +78,12 @@ export default function TaskEditorModal({
 
           {draft.entityType !== "project" ? (
             <label>
-              Project
+              Project (optional)
               <select
                 value={draft.projectId || ""}
                 onChange={(event) => onChange("projectId", event.target.value || null)}
               >
-                <option value="">Select project</option>
+                <option value="">No project</option>
                 {projectOptions.map((project) => (
                   <option key={project.id} value={project.id}>{project.task}</option>
                 ))}
@@ -87,7 +93,7 @@ export default function TaskEditorModal({
 
           {draft.entityType === "task" ? (
             <label>
-              Epic
+              Epic (optional)
               <select
                 value={draft.epicId || ""}
                 onChange={(event) => onChange("epicId", event.target.value || null)}

@@ -2081,6 +2081,14 @@ a.dashboard-list-item:hover {
   font-size: 0.76rem;
 }
 
+.editor-hint {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(15, 118, 110, 0.06);
+  border: 1px solid rgba(15, 118, 110, 0.18);
+}
+
 /* --- Contextual help link --- */
 .help-link {
   display: inline-flex;

@@ -183,10 +183,6 @@ export function prepareWorkItemDraftForSave(draft) {
     return { error: "End date cannot be before start date." };
   }
 
-  if (draft.entityType !== "project" && !draft.projectId) {
-    return { error: "Project selection is required for epics and tasks." };
-  }
-
   return {
     value: {
       ...draft,
