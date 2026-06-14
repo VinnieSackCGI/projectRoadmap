@@ -21,8 +21,7 @@ import HelpLink from "./HelpLink";
 import {
   createEmptyWorkItemDraft,
   formatDateLabel,
-  parseIsoDate,
-  titleCase
+  parseIsoDate
 } from "./workItemUtils";
 import useWorkItemEditor from "./useWorkItemEditor";
 import backgroundImage from "../design/dos wave background.jpg";
@@ -120,14 +119,6 @@ export default function TaskDetailsPage() {
     () => tasks.find((item) => item.id === taskId) || null,
     [tasks, taskId]
   );
-  const project = useMemo(
-    () => (task?.projectId ? tasks.find((item) => item.id === task.projectId) || null : null),
-    [task, tasks]
-  );
-  const epic = useMemo(
-    () => (task?.epicId ? tasks.find((item) => item.id === task.epicId) || null : null),
-    [task, tasks]
-  );
   const subtasks = useMemo(() => (task ? getSubtasks(task.id) : []), [task, tasks]);
   const risk = task ? assessTaskRisk(task) : null;
   const progress = task ? rollupProgress(task, subtasks) : null;
@@ -162,8 +153,6 @@ export default function TaskDetailsPage() {
       entityType: "task",
       lane: task.lane,
       bureau: task.bureau,
-      projectId: task.projectId || (task.entityType === "project" ? task.id : null),
-      epicId: task.epicId || (task.entityType === "epic" ? task.id : null),
       parentTaskId: task.id,
       startDate: task.startDate,
       endDate: task.endDate,
@@ -191,20 +180,8 @@ export default function TaskDetailsPage() {
               {task.description ? <p className="note">{task.description}</p> : null}
               <div className="detail-grid">
                 <div className="detail-block">
-                  <div className="detail-label">Type</div>
-                  <div className="detail-value">{titleCase(task.entityType)}</div>
-                </div>
-                <div className="detail-block">
                   <div className="detail-label">Bureau</div>
                   <div className="detail-value">{task.bureau}</div>
-                </div>
-                <div className="detail-block">
-                  <div className="detail-label">Project</div>
-                  <div className="detail-value">{project?.task || (task.entityType === "project" ? task.task : "Not linked")}</div>
-                </div>
-                <div className="detail-block">
-                  <div className="detail-label">Epic</div>
-                  <div className="detail-value">{epic?.task || (task.entityType === "epic" ? task.task : "None")}</div>
                 </div>
                 <div className="detail-block">
                   <div className="detail-label">Swim lane</div>

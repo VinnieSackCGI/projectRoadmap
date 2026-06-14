@@ -1,11 +1,9 @@
 import React from "react";
 import {
-  TASK_ENTITY_TYPES,
   TASK_PRIORITIES,
   TASK_RISK_LEVELS,
   TASK_STATUSES
 } from "./data";
-import { titleCase } from "./workItemUtils";
 
 export default function TaskEditorModal({
   open,
@@ -47,64 +45,16 @@ export default function TaskEditorModal({
           <button className="secondary-btn" type="button" onClick={onCancel}>Close</button>
         </div>
 
-        <p className="modal-grid-full editor-hint note">
-          Type is just a grouping: a <strong>Project</strong> can contain <strong>Epics</strong>,
-          which can contain <strong>Tasks</strong>. Linking to a project or epic is optional — leave
-          it blank for a standalone item.
-        </p>
-
         <div className="modal-grid">
-          <label>
-            Item type
-            <select
-              value={draft.entityType || "task"}
-              onChange={(event) => onChange("entityType", event.target.value)}
-            >
-              {TASK_ENTITY_TYPES.map((value) => (
-                <option key={value} value={value}>{titleCase(value)}</option>
-              ))}
-            </select>
-          </label>
-
-          <label>
+          <label className="modal-grid-full">
             Item name
             <input
               type="text"
               value={draft.task}
               onChange={(event) => onChange("task", event.target.value)}
-              placeholder="Project, epic, or task title"
+              placeholder="Work item title"
             />
           </label>
-
-          {draft.entityType !== "project" ? (
-            <label>
-              Project (optional)
-              <select
-                value={draft.projectId || ""}
-                onChange={(event) => onChange("projectId", event.target.value || null)}
-              >
-                <option value="">No project</option>
-                {projectOptions.map((project) => (
-                  <option key={project.id} value={project.id}>{project.task}</option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-
-          {draft.entityType === "task" ? (
-            <label>
-              Epic (optional)
-              <select
-                value={draft.epicId || ""}
-                onChange={(event) => onChange("epicId", event.target.value || null)}
-              >
-                <option value="">No epic</option>
-                {epicOptions.map((epic) => (
-                  <option key={epic.id} value={epic.id}>{epic.task}</option>
-                ))}
-              </select>
-            </label>
-          ) : null}
 
           <label>
             Swim lane

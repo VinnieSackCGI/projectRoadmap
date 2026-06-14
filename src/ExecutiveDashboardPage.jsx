@@ -12,21 +12,39 @@ function healthClass(level) {
   return "health-pill healthy";
 }
 
-function summarizeProjects(tasks) {
-  const projects = tasks.filter((task) => task.entityType === "project");
+function collectDescendants(tasks, rootId) {
+  const childrenByParent = new Map();
+  tasks.forEach((task) => {
+    if (task.parentTaskId) {
+      const list = childrenByParent.get(task.parentTaskId) || [];
+      list.push(task);
+      childrenByParent.set(task.parentTaskId, list);
+    }
+  });
+  const out = [];
+  const stack = [...(childrenByParent.get(rootId) || [])];
+  while (stack.length) {
+    const node = stack.pop();
+    out.push(node);
+    const kids = childrenByParent.get(node.id);
+    if (kids) stack.push(...kids);
+  }
+  return out;
+}
 
-  return projects
-    .map((project) => {
-      const descendants = tasks.filter(
-        (task) => task.id !== project.id && task.projectId === project.id
-      );
-      const riskSignals = [project, ...descendants].map((item) => assessTaskRisk(item));
+function summarizeItems(tasks) {
+  const topLevel = tasks.filter((task) => !task.parentTaskId);
+
+  return topLevel
+    .map((item) => {
+      const descendants = collectDescendants(tasks, item.id);
+      const riskSignals = [item, ...descendants].map((entry) => assessTaskRisk(entry));
       const maxRiskScore = riskSignals.reduce((maxScore, risk) => Math.max(maxScore, risk.score), 0);
-      const hasBlocked = [project, ...descendants].some(
-        (item) => (item.status || "").toLowerCase() === "blocked"
+      const hasBlocked = [item, ...descendants].some(
+        (entry) => (entry.status || "").toLowerCase() === "blocked"
       );
-      const hasInProgress = [project, ...descendants].some(
-        (item) => (item.status || "").toLowerCase() === "in progress"
+      const hasInProgress = [item, ...descendants].some(
+        (entry) => (entry.status || "").toLowerCase() === "in progress"
       );
       let health = "Healthy";
 
@@ -37,14 +55,13 @@ function summarizeProjects(tasks) {
       }
 
       return {
-        id: project.id,
-        task: project.task,
-        bureau: project.bureau,
-        lane: project.lane,
-        dueDate: project.dueDate || project.endDate,
+        id: item.id,
+        task: item.task,
+        bureau: item.bureau,
+        lane: item.lane,
+        dueDate: item.dueDate || item.endDate,
         health,
-        epicCount: descendants.filter((item) => item.entityType === "epic").length,
-        taskCount: descendants.filter((item) => item.entityType === "task").length,
+        subtaskCount: descendants.length,
         reasons: riskSignals.reduce((allReasons, risk) => [...allReasons, ...risk.reasons], [])
       };
     })
@@ -61,7 +78,7 @@ export default function ExecutiveDashboardPage() {
   const tasks = useTasks();
   const staffing = useStaffing();
 
-  const initiatives = useMemo(() => summarizeProjects(tasks), [tasks]);
+  const initiatives = useMemo(() => summarizeItems(tasks), [tasks]);
   const burnout = useMemo(() => assessStaffBurnout(staffing, tasks), [staffing, tasks]);
   const upcomingDeadlines = useMemo(
     () => [...initiatives].filter((item) => item.dueDate).slice(0, 6),
@@ -83,9 +100,9 @@ export default function ExecutiveDashboardPage() {
     const overloaded = burnout.filter((person) => person.level === "Overloaded").length;
 
     return [
-      { label: "Healthy projects", value: healthy },
-      { label: "At risk projects", value: atRisk },
-      { label: "Critical projects", value: critical },
+      { label: "Healthy items", value: healthy },
+      { label: "At risk items", value: atRisk },
+      { label: "Critical items", value: critical },
       { label: "Overloaded staff", value: overloaded }
     ];
   }, [burnout, initiatives]);
@@ -124,7 +141,7 @@ export default function ExecutiveDashboardPage() {
         <section className="dashboard-grid">
           <section className="card page-panel dashboard-panel">
             <div className="section-title">Portfolio Health</div>
-            <h2>Project Status</h2>
+            <h2>Work Item Status</h2>
             {initiatives.length ? (
               <div className="health-card-grid">
                 {initiatives.map((initiative) => (
@@ -134,7 +151,9 @@ export default function ExecutiveDashboardPage() {
                     <span className={healthClass(initiative.health)}>{initiative.health}</span>
                   </div>
                   <div className="detail-value">{initiative.bureau} · {initiative.lane}</div>
-                  <div className="burnout-meta">{initiative.epicCount} epics · {initiative.taskCount} task items</div>
+                  {initiative.subtaskCount > 0 ? (
+                    <div className="burnout-meta">{initiative.subtaskCount} subtask{initiative.subtaskCount === 1 ? "" : "s"}</div>
+                  ) : null}
                   <div className="burnout-meta">Due {formatDateLabel(initiative.dueDate)}</div>
                   <p className="note">
                     {initiative.reasons.length ? initiative.reasons[0] : "No material signal detected."}
@@ -143,7 +162,7 @@ export default function ExecutiveDashboardPage() {
                 ))}
               </div>
             ) : (
-              <p className="note">No explicit project items are available yet in the roadmap data.</p>
+              <p className="note">No work items in the roadmap yet.</p>
             )}
           </section>
 
@@ -183,7 +202,7 @@ export default function ExecutiveDashboardPage() {
 
           <section className="card page-panel dashboard-panel">
             <div className="section-title">Watch List</div>
-            <h2>Projects At Risk</h2>
+            <h2>Items At Risk</h2>
             <div className="dashboard-list">
               {criticalProjects.length ? criticalProjects.map((item) => (
                 <Link className="dashboard-list-item" key={item.id} to={`/tasks/${item.id}`}>

@@ -108,26 +108,6 @@ export function createEmptyWorkItemDraft({ lane, bureau, fallbackDate } = {}) {
 export function updateWorkItemDraft(previous, field, value) {
   const next = { ...previous, [field]: value };
 
-  if (field === "entityType") {
-    if (value === "project") {
-      next.projectId = null;
-      next.epicId = null;
-      next.parentTaskId = null;
-    } else if (value === "epic") {
-      next.epicId = null;
-    }
-  }
-
-  if (field === "projectId" && next.entityType === "task") {
-    next.epicId = null;
-  }
-
-  next.parentTaskId = next.entityType === "project"
-    ? null
-    : next.entityType === "epic"
-      ? next.projectId || null
-      : next.epicId || next.projectId || null;
-
   next.startDate = normalizeDateString(next.startDate, {
     fallback: TIMELINE_START_DATE,
     min: TIMELINE_START_DATE,

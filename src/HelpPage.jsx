@@ -49,7 +49,6 @@ const SECTIONS = [
     title: "Work Item details",
     steps: [
       ["Open", "Click a work item’s name anywhere, or “Open Details” from the pinned roadmap card."],
-      ["Item types", "“Type” is an optional grouping: a Project can contain Epics, which can contain Tasks. Linking to a project or epic is optional — leave it blank for a standalone item, and you can still edit it freely."],
       ["Edit", "Use Edit Work Item to change any field. Empty optional fields are hidden with an “Add details” shortcut."],
       ["Subtasks", "Add subtasks (they inherit the parent’s context). A mini-roadmap shows their timing, and parent progress rolls up from subtask effort estimates."],
       ["Flags", "Raise an At Risk or Scope Unclear flag with a short comment. Resolving a flag requires a resolution note."],

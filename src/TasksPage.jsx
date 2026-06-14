@@ -18,8 +18,7 @@ import {
 } from "./taskStore";
 import {
   createEmptyWorkItemDraft,
-  formatDateLabel,
-  titleCase
+  formatDateLabel
 } from "./workItemUtils";
 import useWorkItemEditor from "./useWorkItemEditor";
 import HelpLink from "./HelpLink";
@@ -284,7 +283,6 @@ export default function TasksPage() {
                 <tr>
                   {[
                     { key: "name", label: "Name" },
-                    { key: "type", label: "Type" },
                     { key: "owners", label: "Owners" },
                     { key: "bureau", label: "Bureau" },
                     { key: "lane", label: "Swim lane" },
@@ -426,7 +424,7 @@ export default function TasksPage() {
               <tbody>
                 {sortedTasks.length === 0 ? (
                   <tr>
-                    <td className="task-empty-cell" colSpan={10}>
+                    <td className="task-empty-cell" colSpan={9}>
                       No work items match the current filters.
                     </td>
                   </tr>
@@ -444,7 +442,6 @@ export default function TasksPage() {
                           {task.task}
                         </Link>
                       </td>
-                      <td>{titleCase(task.entityType)}</td>
                       <td>{ownerLabel}</td>
                       <td>{task.bureau}</td>
                       <td>{task.lane}</td>
