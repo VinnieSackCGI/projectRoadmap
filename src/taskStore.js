@@ -677,7 +677,8 @@ export function exportRoadmap() {
     version: 2,
     exportedAt: new Date().toISOString(),
     tasks: getTasks(),
-    staffing: getStaffing()
+    staffing: getStaffing(),
+    lanes: getLanes()
   };
 }
 
@@ -685,7 +686,14 @@ export function importRoadmap(payload) {
   if (!payload || typeof payload !== "object") return false;
   const nextTasks = Array.isArray(payload.tasks) ? payload.tasks : null;
   const nextStaffing = Array.isArray(payload.staffing) ? payload.staffing : null;
-  if (!nextTasks && !nextStaffing) return false;
+  const nextLanes = Array.isArray(payload.lanes) ? payload.lanes : null;
+  if (!nextTasks && !nextStaffing && !nextLanes) return false;
+  if (nextLanes) {
+    lanesState = nextLanes
+      .filter((lane) => lane && lane.key)
+      .map((lane) => ({ key: String(lane.key), caption: String(lane.caption || "") }));
+    persistLanes();
+  }
   if (nextTasks) {
     tasksState = normalizeTaskCollection(nextTasks);
     persistTasks();
