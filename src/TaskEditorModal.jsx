@@ -12,8 +12,6 @@ export default function TaskEditorModal({
   lanes,
   bureauOptions,
   staffing = [],
-  projectOptions = [],
-  epicOptions = [],
   onChange,
   onCancel,
   onSave,

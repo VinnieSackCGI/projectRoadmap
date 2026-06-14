@@ -128,16 +128,13 @@ export default function TaskDetailsPage() {
     deleteDraftTask,
     draft,
     editorMode,
-    epicOptions,
     isEditorOpen,
     openCreateEditor,
     openEditEditor,
-    projectOptions,
     saveDraft,
     updateDraft,
     validationError
   } = useWorkItemEditor({
-    tasks,
     createEmptyDraft,
     onCreate: storeCreateTask,
     onUpdate: storeUpdateTask,
@@ -369,8 +366,6 @@ export default function TaskDetailsPage() {
         lanes={lanes}
         bureauOptions={bureauOptions}
         staffing={staffing}
-        projectOptions={projectOptions}
-        epicOptions={epicOptions}
         onChange={updateDraft}
         onCancel={closeEditor}
         onSave={saveDraft}

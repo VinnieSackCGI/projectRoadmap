@@ -516,18 +516,6 @@ export function getTasks() {
   return tasksState;
 }
 
-export function getProjects() {
-  return tasksState.filter((task) => task.entityType === "project");
-}
-
-export function getEpics() {
-  return tasksState.filter((task) => task.entityType === "epic");
-}
-
-export function getTaskItems() {
-  return tasksState.filter((task) => task.entityType === "task");
-}
-
 export function getStaffing() {
   return staffingState;
 }
@@ -909,18 +897,6 @@ export function useTasks() {
   return useSyncExternalStore(subscribe, getTasks, getTasks);
 }
 
-export function useProjects() {
-  return useSyncExternalStore(subscribe, getProjects, getProjects);
-}
-
-export function useEpics() {
-  return useSyncExternalStore(subscribe, getEpics, getEpics);
-}
-
-export function useTaskItems() {
-  return useSyncExternalStore(subscribe, getTaskItems, getTaskItems);
-}
-
 export function useStaffing() {
   return useSyncExternalStore(subscribe, getStaffing, getStaffing);
 }
@@ -935,9 +911,6 @@ export function useLanes() {
 if (typeof window !== "undefined") {
   window.projectRoadmap = {
     listTasks: () => getTasks().map((task) => ({ ...task })),
-    listProjects: () => getProjects().map((task) => ({ ...task })),
-    listEpics: () => getEpics().map((task) => ({ ...task })),
-    listTaskItems: () => getTaskItems().map((task) => ({ ...task })),
     getTask: (id) => {
       const task = getTask(id);
       return task ? { ...task } : null;

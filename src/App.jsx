@@ -901,16 +901,13 @@ export default function App() {
     deleteDraftTask,
     draft,
     editorMode,
-    epicOptions,
     isEditorOpen,
     openCreateEditor,
     openEditEditor,
-    projectOptions,
     saveDraft,
     updateDraft,
     validationError
   } = useWorkItemEditor({
-    tasks,
     createEmptyDraft,
     onCreate: (normalized) => {
       const created = storeCreateTask(normalized);
@@ -1633,8 +1630,6 @@ export default function App() {
         lanes={lanes}
         bureauOptions={bureauOptions}
         staffing={staffing}
-        projectOptions={projectOptions}
-        epicOptions={epicOptions}
         onChange={updateDraft}
         onCancel={closeEditor}
         onSave={saveDraft}

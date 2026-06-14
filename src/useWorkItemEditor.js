@@ -1,8 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { prepareWorkItemDraftForSave, updateWorkItemDraft } from "./workItemUtils";
 
 export default function useWorkItemEditor({
-  tasks,
   createEmptyDraft,
   onCreate,
   onUpdate,
@@ -13,18 +12,6 @@ export default function useWorkItemEditor({
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [draft, setDraft] = useState(createEmptyDraft());
   const [validationError, setValidationError] = useState("");
-
-  const projectOptions = useMemo(
-    () => tasks.filter((task) => task.entityType === "project"),
-    [tasks]
-  );
-
-  const epicOptions = useMemo(
-    () => tasks.filter(
-      (task) => task.entityType === "epic" && (!draft.projectId || task.projectId === draft.projectId)
-    ),
-    [draft.projectId, tasks]
-  );
 
   const openCreateEditor = useCallback((seed) => {
     // Guard against being used directly as an onClick handler (seed = event).
@@ -92,9 +79,7 @@ export default function useWorkItemEditor({
     draft,
     editingTaskId,
     editorMode,
-    epicOptions,
     isEditorOpen,
-    projectOptions,
     validationError,
     closeEditor,
     deleteDraftTask,
