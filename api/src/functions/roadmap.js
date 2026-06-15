@@ -84,6 +84,21 @@ app.http("roadmapPut", {
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return { status: 400, jsonBody: { error: "Body must be a roadmap object" } };
     }
+
+    // Rollout guard: once the shared store has been upgraded to the multi-roadmap
+    // shape, refuse a legacy flat write from an un-refreshed old client so it can
+    // never overwrite (and lose) the multi-roadmap document.
+    if (!Array.isArray(body.roadmaps)) {
+      try {
+        const { doc } = await readRoadmap();
+        if (Array.isArray(doc.roadmaps) && doc.roadmaps.length > 0) {
+          return { status: 409, jsonBody: { error: "Roadmap upgraded; refresh required" } };
+        }
+      } catch (err) {
+        context.error("Rollout guard read failed", err);
+      }
+    }
+
     const ifMatch = request.headers.get("if-match");
     const ifNoneMatch = request.headers.get("if-none-match");
     try {
