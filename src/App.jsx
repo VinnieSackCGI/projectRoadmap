@@ -306,7 +306,7 @@ function LaneTrack({
     <>
       <div
         className={`lane-name ${laneIndex % 2 === 1 ? "alt" : ""} ${collapsed ? "is-collapsed" : ""}`}
-        style={{ minHeight: `${laneHeight}px` }}
+        style={{ minHeight: `${laneHeight}px`, borderLeft: `5px solid ${lane.color || "transparent"}` }}
       >
         <button
           type="button"
@@ -318,7 +318,10 @@ function LaneTrack({
           {collapsed ? "▸" : "▾"}
         </button>
         <div className="lane-name-text">
-          <div className="lane-title">{lane.key}</div>
+          <div className="lane-title">
+            <span className="lane-color-dot" style={{ background: lane.color || "var(--muted)" }} aria-hidden="true" />
+            {lane.key}
+          </div>
           {collapsed ? (
             <div className="lane-caption">{laneTasks.length} item{laneTasks.length === 1 ? "" : "s"}</div>
           ) : (
@@ -613,7 +616,11 @@ function AssignmentHub({
           <div
             key={lane.key}
             className="hub-lane-badge"
-            style={{ left: `${lane.left}%`, top: `${lane.top}%` }}
+            style={{
+              left: `${lane.left}%`,
+              top: `${lane.top}%`,
+              background: lane.color || undefined
+            }}
           >
             {lane.key}
           </div>
@@ -1025,6 +1032,7 @@ export default function App() {
 
       return {
         key: lane.key,
+        color: lane.color,
         left: (laneCenterPoint.x / HUB_VIEWBOX_WIDTH) * 100,
         top: (laneCenterPoint.y / HUB_VIEWBOX_HEIGHT) * 100
       };

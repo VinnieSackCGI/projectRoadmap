@@ -1824,6 +1824,39 @@ a.dashboard-list-item:hover {
   min-width: 0;
 }
 
+.lane-color-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.lane-color-field {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.lane-color-field input[type="color"] {
+  width: 40px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgba(88, 80, 62, 0.22);
+  border-radius: 8px;
+  background: #fffdf8;
+  cursor: pointer;
+}
+
+.lane-color-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .lane-collapse-btn {
   appearance: none;
   flex: none;

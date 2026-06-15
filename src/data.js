@@ -13,26 +13,42 @@ export const years = [
 export const TIMELINE_START_DATE = "2025-10-01";
 export const TIMELINE_END_DATE = "2028-09-30";
 
+export const LANE_COLOR_PALETTE = [
+  "#2267c4",
+  "#14806d",
+  "#a24689",
+  "#8a5a00",
+  "#6a5acd",
+  "#c5403f",
+  "#0f766e",
+  "#5c667a"
+];
+
 export const lanes = [
   {
     key: "Domestic Budget and Execution",
-    caption: "Domestic planning, execution tracking, and bureau rollout."
+    caption: "Domestic planning, execution tracking, and bureau rollout.",
+    color: "#2267c4"
   },
   {
     key: "Overseas Dashboard and Budget Formulation",
-    caption: "Post-level budget formulation and regional dashboard work."
+    caption: "Post-level budget formulation and regional dashboard work.",
+    color: "#14806d"
   },
   {
     key: "Country or Bureau Specific Solution",
-    caption: "One-off bureau, country, and urgent-response solution work."
+    caption: "One-off bureau, country, and urgent-response solution work.",
+    color: "#a24689"
   },
   {
     key: "Appropriations and Spend Plan",
-    caption: "Spend plan phases, reconciliation, and scenario planning."
+    caption: "Spend plan phases, reconciliation, and scenario planning.",
+    color: "#8a5a00"
   },
   {
     key: "Regional Platform and Shared Services",
-    caption: "Shared apps, portal, OM support, DT&A, and platform foundation."
+    caption: "Shared apps, portal, OM support, DT&A, and platform foundation.",
+    color: "#6a5acd"
   }
 ];
 

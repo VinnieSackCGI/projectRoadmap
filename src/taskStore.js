@@ -11,6 +11,7 @@ import {
   initialStaffing,
   initialTasks,
   lanes as defaultLanes,
+  LANE_COLOR_PALETTE,
   TASK_ENTITY_TYPES,
   TIMELINE_END_DATE,
   TIMELINE_START_DATE,
@@ -408,6 +409,18 @@ function persistTasksLocal() {
   safeSetItem(TASKS_KEY, JSON.stringify(tasksState));
 }
 
+function normalizeLane(lane, index = 0) {
+  return {
+    key: String(lane.key),
+    caption: String(lane.caption || ""),
+    color: lane.color || LANE_COLOR_PALETTE[index % LANE_COLOR_PALETTE.length]
+  };
+}
+
+function normalizeLaneList(list) {
+  return list.filter((lane) => lane && lane.key).map((lane, index) => normalizeLane(lane, index));
+}
+
 function loadLanesFromStorage() {
   if (typeof window === "undefined") {
     return defaultLanes.map((lane) => ({ ...lane }));
@@ -416,9 +429,7 @@ function loadLanesFromStorage() {
   if (raw) {
     const parsed = safeParse(raw);
     if (parsed && parsed.length > 0) {
-      return parsed
-        .filter((lane) => lane && lane.key)
-        .map((lane) => ({ key: String(lane.key), caption: String(lane.caption || "") }));
+      return normalizeLaneList(parsed);
     }
   }
   return defaultLanes.map((lane) => ({ ...lane }));
@@ -465,9 +476,7 @@ async function hydrateFromRemote() {
 
   // Lanes first, so incoming tasks validate against the shared lane set.
   if (Array.isArray(remote.lanes) && remote.lanes.length > 0) {
-    lanesState = remote.lanes
-      .filter((lane) => lane && lane.key)
-      .map((lane) => ({ key: String(lane.key), caption: String(lane.caption || "") }));
+    lanesState = normalizeLaneList(remote.lanes);
     persistLanesLocal();
     changed = true;
     remoteWasEmpty = false;
@@ -689,9 +698,7 @@ export function importRoadmap(payload) {
   const nextLanes = Array.isArray(payload.lanes) ? payload.lanes : null;
   if (!nextTasks && !nextStaffing && !nextLanes) return false;
   if (nextLanes) {
-    lanesState = nextLanes
-      .filter((lane) => lane && lane.key)
-      .map((lane) => ({ key: String(lane.key), caption: String(lane.caption || "") }));
+    lanesState = normalizeLaneList(nextLanes);
     persistLanes();
   }
   if (nextTasks) {
@@ -708,19 +715,26 @@ export function importRoadmap(payload) {
 
 // --- Swim lane management (PM/Admin) ---
 
-export function addLane({ key, caption } = {}) {
+export function addLane({ key, caption, color } = {}) {
   const trimmed = (key || "").trim();
   if (!trimmed) return false;
   if (lanesState.some((lane) => lane.key.toLowerCase() === trimmed.toLowerCase())) {
     return false;
   }
-  lanesState = [...lanesState, { key: trimmed, caption: (caption || "").trim() }];
+  lanesState = [
+    ...lanesState,
+    {
+      key: trimmed,
+      caption: (caption || "").trim(),
+      color: color || LANE_COLOR_PALETTE[lanesState.length % LANE_COLOR_PALETTE.length]
+    }
+  ];
   persistLanes();
   emit();
   return true;
 }
 
-export function renameLane(oldKey, { key, caption } = {}) {
+export function renameLane(oldKey, { key, caption, color } = {}) {
   const trimmed = (key || "").trim();
   if (!trimmed) return false;
   const existing = lanesState.find((lane) => lane.key === oldKey);
@@ -733,7 +747,11 @@ export function renameLane(oldKey, { key, caption } = {}) {
   }
   lanesState = lanesState.map((lane) =>
     lane.key === oldKey
-      ? { key: trimmed, caption: caption !== undefined ? caption : lane.caption }
+      ? {
+          key: trimmed,
+          caption: caption !== undefined ? caption : lane.caption,
+          color: color !== undefined ? color : lane.color
+        }
       : lane
   );
   if (trimmed !== oldKey) {
