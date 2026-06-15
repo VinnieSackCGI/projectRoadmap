@@ -13,9 +13,10 @@ let pushTimer = null;
 let inFlight = false;
 let pendingPayload = null;
 
-// Returns:
-//   { tasks, staffing, lanes }  when the API is reachable (arrays may be empty)
-//   null                        when there is no API (local dev / offline)
+// Returns the shared roadmap document as-is — either the multi-roadmap shape
+//   { roadmaps, data }  or the legacy single-roadmap shape { tasks, staffing, lanes }.
+// Returns null when there is no API (local dev / offline); the store falls back
+// to localStorage in that case.
 export async function fetchRemoteRoadmap() {
   if (typeof fetch === "undefined") return null;
   try {
@@ -23,11 +24,7 @@ export async function fetchRemoteRoadmap() {
     if (!res.ok) return null;
     const data = await res.json();
     if (!data || typeof data !== "object") return null;
-    return {
-      tasks: Array.isArray(data.tasks) ? data.tasks : [],
-      staffing: Array.isArray(data.staffing) ? data.staffing : [],
-      lanes: Array.isArray(data.lanes) ? data.lanes : []
-    };
+    return data;
   } catch {
     return null;
   }

@@ -1,5 +1,6 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
+import RoadmapSwitcher from "./RoadmapSwitcher";
 import logoWhite from "../design/dos-flag-seal-logo-horizontal-color-whitetext.png";
 
 const NAV_ITEMS = [
@@ -7,6 +8,7 @@ const NAV_ITEMS = [
   { to: "/tasks", label: "Work Items" },
   { to: "/staffing", label: "Staffing" },
   { to: "/executive", label: "Executive" },
+  { to: "/portfolio", label: "Portfolio" },
   { to: "/help", label: "Guide" }
 ];
 
@@ -31,6 +33,7 @@ export default function AppHeader() {
         <div className="brand">
           <img src={logoWhite} alt="Department of State seal logo" />
         </div>
+        <RoadmapSwitcher />
         <nav className="nav-bar" aria-label="Primary" role="tablist">
           {NAV_ITEMS.map((item) => (
             <NavLink

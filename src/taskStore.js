@@ -25,15 +25,26 @@ const LANES_KEY = "project-roadmap-lanes-v1";
 const LEGACY_TASKS_KEY = "regional-planning-react-tasks-v1";
 const ROADMAP_DATE_SYNC_KEY = "project-roadmap-date-sync-v1";
 const MILESTONE_SEED_KEY = "project-roadmap-milestone-seed-v1";
+// Multi-roadmap workspaces: one shared document holds every roadmap; the active
+// selection is local to each browser.
+const WORKSPACES_KEY = "project-roadmap-workspaces-v1";
+const ACTIVE_KEY = "project-roadmap-active-roadmap-v1";
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const VALID_ENTITY_TYPES = new Set(TASK_ENTITY_TYPES);
 
 const listeners = new Set();
+// Active-roadmap views (what every hook reads). They always point at the slice
+// for `activeRoadmapId` inside `roadmapData`.
 let tasksState = [];
 let staffingState = [];
 // Seeded with the default lanes so early task normalization always has a valid
 // set to validate against; overwritten from storage during init below.
 let lanesState = defaultLanes.map((lane) => ({ ...lane }));
+
+// Multi-roadmap registry + per-roadmap data.
+let roadmaps = []; // [{ id, name, createdAt }]
+let roadmapData = {}; // { [id]: { tasks, staffing, lanes } }
+let activeRoadmapId = null;
 
 function safeSetItem(key, value) {
   if (typeof window === "undefined") return;
@@ -178,7 +189,9 @@ function withTaskDefaults(task, index = 0) {
     merged.id = `task-${index + 1}`;
   }
   merged.entityType = normalizeEntityType(merged.entityType, inferEntityType(merged));
-  if (!lanesState.some((lane) => lane.key === merged.lane)) {
+  // Only fill a missing lane; keep any non-empty lane as-is so each roadmap's
+  // tasks normalize independently of whichever roadmap is currently active.
+  if (!merged.lane) {
     merged.lane = lanesState[0]?.key || merged.lane;
   }
   // One-time migration: legacy `owners` free-text → ownerIds + externalOwners.
@@ -400,13 +413,28 @@ function loadStaffingFromStorage() {
   return initialStaffing;
 }
 
+// Copy the active-roadmap views back into the workspace document.
+function syncActiveSlice() {
+  if (!activeRoadmapId) return;
+  roadmapData[activeRoadmapId] = {
+    tasks: tasksState,
+    staffing: staffingState,
+    lanes: lanesState
+  };
+}
+
+function saveWorkspacesLocal() {
+  syncActiveSlice();
+  safeSetItem(WORKSPACES_KEY, JSON.stringify({ version: 3, roadmaps, data: roadmapData }));
+}
+
 function persistTasks() {
-  persistTasksLocal();
+  saveWorkspacesLocal();
   schedulePush();
 }
 
 function persistTasksLocal() {
-  safeSetItem(TASKS_KEY, JSON.stringify(tasksState));
+  saveWorkspacesLocal();
 }
 
 function normalizeLane(lane, index = 0) {
@@ -436,21 +464,21 @@ function loadLanesFromStorage() {
 }
 
 function persistLanesLocal() {
-  safeSetItem(LANES_KEY, JSON.stringify(lanesState));
+  saveWorkspacesLocal();
 }
 
 function persistLanes() {
-  persistLanesLocal();
+  saveWorkspacesLocal();
   schedulePush();
 }
 
 function persistStaffing() {
-  persistStaffingLocal();
+  saveWorkspacesLocal();
   schedulePush();
 }
 
 function persistStaffingLocal() {
-  safeSetItem(STAFF_KEY, JSON.stringify(staffingState));
+  saveWorkspacesLocal();
 }
 
 // --- Shared-roadmap sync (Azure Static Web Apps /api/roadmap) ---
@@ -460,7 +488,35 @@ let remoteAvailable = false;
 
 function schedulePush() {
   if (!remoteAvailable) return;
-  pushRemoteRoadmap(() => ({ tasks: tasksState, staffing: staffingState, lanes: lanesState }));
+  pushRemoteRoadmap(() => {
+    syncActiveSlice();
+    return { version: 3, roadmaps, data: roadmapData };
+  });
+}
+
+function normalizeRoadmapSlice(slice = {}) {
+  return {
+    tasks: normalizeTaskCollection(Array.isArray(slice.tasks) ? slice.tasks : []),
+    staffing: Array.isArray(slice.staffing) ? slice.staffing : [],
+    lanes: normalizeLaneList(
+      Array.isArray(slice.lanes) && slice.lanes.length ? slice.lanes : defaultLanes
+    )
+  };
+}
+
+function normalizeWorkspaceDoc(doc) {
+  const list = doc.roadmaps
+    .filter((roadmap) => roadmap && roadmap.id)
+    .map((roadmap) => ({
+      id: String(roadmap.id),
+      name: String(roadmap.name || "Untitled roadmap"),
+      createdAt: roadmap.createdAt || null
+    }));
+  const data = {};
+  list.forEach((roadmap) => {
+    data[roadmap.id] = normalizeRoadmapSlice((doc.data || {})[roadmap.id]);
+  });
+  return { roadmaps: list, data };
 }
 
 async function hydrateFromRemote() {
@@ -471,37 +527,40 @@ async function hydrateFromRemote() {
   }
 
   remoteAvailable = true;
-  let changed = false;
-  let remoteWasEmpty = true;
 
-  // Lanes first, so incoming tasks validate against the shared lane set.
-  if (Array.isArray(remote.lanes) && remote.lanes.length > 0) {
-    lanesState = normalizeLaneList(remote.lanes);
-    persistLanesLocal();
-    changed = true;
-    remoteWasEmpty = false;
+  if (Array.isArray(remote.roadmaps) && remote.roadmaps.length > 0 && remote.data) {
+    const ws = normalizeWorkspaceDoc(remote);
+    roadmaps = ws.roadmaps;
+    roadmapData = ws.data;
+    if (!roadmapData[activeRoadmapId]) {
+      activeRoadmapId = roadmaps[0].id;
+      if (typeof window !== "undefined") window.localStorage.setItem(ACTIVE_KEY, activeRoadmapId);
+    }
+    applyActiveRoadmap();
+    saveWorkspacesLocal();
+    emit();
+    return;
   }
 
-  if (remote.tasks.length > 0) {
-    tasksState = normalizeTaskCollection(remote.tasks);
-    persistTasksLocal();
-    changed = true;
-    remoteWasEmpty = false;
-  }
-
-  if (remote.staffing.length > 0) {
-    staffingState = remote.staffing;
-    persistStaffingLocal();
-    changed = true;
-    remoteWasEmpty = false;
-  }
-
-  if (remoteWasEmpty) {
-    // First deploy: seed the shared store from whatever this client has.
+  // Legacy single-roadmap remote shape → fold into the first roadmap.
+  const legacyTasks = Array.isArray(remote.tasks) ? remote.tasks : [];
+  const legacyStaffing = Array.isArray(remote.staffing) ? remote.staffing : [];
+  const legacyLanes = Array.isArray(remote.lanes) ? remote.lanes : [];
+  if (legacyTasks.length || legacyStaffing.length || legacyLanes.length) {
+    const id = roadmaps[0].id;
+    const current = roadmapData[id] || normalizeRoadmapSlice();
+    roadmapData[id] = normalizeRoadmapSlice({
+      tasks: legacyTasks.length ? legacyTasks : current.tasks,
+      staffing: legacyStaffing.length ? legacyStaffing : current.staffing,
+      lanes: legacyLanes.length ? legacyLanes : current.lanes
+    });
+    if (activeRoadmapId === id) applyActiveRoadmap();
+    saveWorkspacesLocal();
+    emit();
+  } else {
+    // Remote empty → seed the shared store from this client.
     schedulePush();
   }
-
-  if (changed) emit();
 }
 
 function emit() {
@@ -539,13 +598,159 @@ function maybeSeedMilestones(tasks) {
   return changed ? seeded : tasks;
 }
 
-lanesState = loadLanesFromStorage();
-tasksState = maybeSeedMilestones(loadTasksFromStorage());
-staffingState = loadStaffingFromStorage();
+function makeRoadmapId() {
+  return generateId("rm");
+}
+
+function buildDefaultWorkspace() {
+  const tasks = maybeSeedMilestones(loadTasksFromStorage());
+  const lanes = loadLanesFromStorage();
+  const staffing = loadStaffingFromStorage();
+  const id = "default";
+  return {
+    roadmaps: [{ id, name: "Regional Roadmap", createdAt: new Date().toISOString() }],
+    data: { [id]: { tasks, staffing, lanes } }
+  };
+}
+
+function loadWorkspaces() {
+  if (typeof window === "undefined") {
+    const id = "default";
+    return {
+      roadmaps: [{ id, name: "Regional Roadmap", createdAt: null }],
+      data: {
+        [id]: {
+          tasks: normalizeTaskCollection(initialTasks),
+          staffing: initialStaffing,
+          lanes: defaultLanes.map((lane) => ({ ...lane }))
+        }
+      }
+    };
+  }
+
+  const raw = window.localStorage.getItem(WORKSPACES_KEY);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.roadmaps) && parsed.roadmaps.length > 0 && parsed.data) {
+        return normalizeWorkspaceDoc(parsed);
+      }
+    } catch {
+      // fall through to legacy migration
+    }
+  }
+
+  // First run on this browser → migrate the legacy single-roadmap keys.
+  const built = buildDefaultWorkspace();
+  safeSetItem(WORKSPACES_KEY, JSON.stringify({ version: 3, ...built }));
+  return built;
+}
+
+function applyActiveRoadmap() {
+  const slice = roadmapData[activeRoadmapId] || normalizeRoadmapSlice();
+  tasksState = slice.tasks;
+  staffingState = slice.staffing;
+  lanesState = slice.lanes;
+}
+
+(function initWorkspaces() {
+  const ws = loadWorkspaces();
+  roadmaps = ws.roadmaps;
+  roadmapData = ws.data;
+  const savedActive = typeof window !== "undefined" ? window.localStorage.getItem(ACTIVE_KEY) : null;
+  activeRoadmapId =
+    savedActive && roadmaps.some((roadmap) => roadmap.id === savedActive)
+      ? savedActive
+      : roadmaps[0].id;
+  applyActiveRoadmap();
+})();
 
 if (typeof window !== "undefined") {
   // Pull the shared copy (and seed it on first deploy). Safe no-op in local dev.
   hydrateFromRemote();
+}
+
+// --- Roadmap workspaces (create / switch / rename / delete) ---
+
+export function getRoadmaps() {
+  return roadmaps;
+}
+
+export function getActiveRoadmapId() {
+  return activeRoadmapId;
+}
+
+export function getActiveRoadmap() {
+  return roadmaps.find((roadmap) => roadmap.id === activeRoadmapId) || null;
+}
+
+export function switchRoadmap(id) {
+  if (id === activeRoadmapId || !roadmapData[id]) return false;
+  syncActiveSlice();
+  activeRoadmapId = id;
+  if (typeof window !== "undefined") window.localStorage.setItem(ACTIVE_KEY, id);
+  applyActiveRoadmap();
+  emit();
+  return true;
+}
+
+export function createRoadmap(name) {
+  const id = makeRoadmapId();
+  const trimmed = (name || "").trim() || "Untitled roadmap";
+  roadmaps = [...roadmaps, { id, name: trimmed, createdAt: new Date().toISOString() }];
+  roadmapData[id] = {
+    tasks: [],
+    staffing: [],
+    lanes: defaultLanes.map((lane, index) => normalizeLane(lane, index))
+  };
+  saveWorkspacesLocal();
+  schedulePush();
+  emit();
+  return id;
+}
+
+export function renameRoadmap(id, name) {
+  const trimmed = (name || "").trim();
+  if (!trimmed) return false;
+  if (!roadmaps.some((roadmap) => roadmap.id === id)) return false;
+  roadmaps = roadmaps.map((roadmap) =>
+    roadmap.id === id ? { ...roadmap, name: trimmed } : roadmap
+  );
+  saveWorkspacesLocal();
+  schedulePush();
+  emit();
+  return true;
+}
+
+export function deleteRoadmap(id) {
+  if (roadmaps.length <= 1) return false;
+  if (!roadmapData[id]) return false;
+  roadmaps = roadmaps.filter((roadmap) => roadmap.id !== id);
+  delete roadmapData[id];
+  if (activeRoadmapId === id) {
+    activeRoadmapId = roadmaps[0].id;
+    if (typeof window !== "undefined") window.localStorage.setItem(ACTIVE_KEY, activeRoadmapId);
+    applyActiveRoadmap();
+  }
+  saveWorkspacesLocal();
+  schedulePush();
+  emit();
+  return true;
+}
+
+// Read-only snapshot of every roadmap's data for the cross-roadmap total view.
+export function getRoadmapPortfolio() {
+  syncActiveSlice();
+  return roadmaps.map((roadmap) => {
+    const slice = roadmapData[roadmap.id] || { tasks: [], staffing: [], lanes: [] };
+    return {
+      id: roadmap.id,
+      name: roadmap.name,
+      tasks: slice.tasks,
+      staffing: slice.staffing,
+      lanes: slice.lanes
+    };
+  });
 }
 
 export function subscribe(fn) {
@@ -1005,6 +1210,14 @@ export function useLanes() {
   return useSyncExternalStore(subscribe, getLanes, getLanes);
 }
 
+export function useRoadmaps() {
+  return useSyncExternalStore(subscribe, getRoadmaps, getRoadmaps);
+}
+
+export function useActiveRoadmapId() {
+  return useSyncExternalStore(subscribe, getActiveRoadmapId, getActiveRoadmapId);
+}
+
 // --- Agent surface ---
 // A future PM agent can call these from the browser console or via an injected
 // chat panel. Keep the surface narrow and JSON-friendly.
@@ -1044,6 +1257,12 @@ if (typeof window !== "undefined") {
     reorderLane,
     exportRoadmap,
     importRoadmap,
+    listRoadmaps: () => getRoadmaps().map((roadmap) => ({ ...roadmap })),
+    getActiveRoadmapId,
+    switchRoadmap,
+    createRoadmap,
+    renameRoadmap,
+    deleteRoadmap,
     assessTaskRisk: (idOrTask) => {
       const task = typeof idOrTask === "string" ? getTask(idOrTask) : idOrTask;
       return task ? assessTaskRisk(task) : null;

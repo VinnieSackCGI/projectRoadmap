@@ -13,6 +13,16 @@ const SECTIONS = [
     ]
   },
   {
+    id: "portfolio",
+    title: "Roadmaps & the portfolio view",
+    steps: [
+      ["Switch", "Use the roadmap menu in the header (next to the logo) to switch between roadmap workspaces. Each roadmap has its own work items, lanes, and staff."],
+      ["Create", "“+ New roadmap” starts a fresh workspace from the standard lane template with no work items — good for a new team or initiative."],
+      ["Manage", "“Manage roadmaps…” lets you rename or delete a roadmap (deleting removes everything in it)."],
+      ["Portfolio", "The Portfolio tab rolls every roadmap up into one total view — counts, risk, overdue milestones, and anyone staffed across more than one roadmap. “Switch & open” jumps into a roadmap."]
+    ]
+  },
+  {
     id: "roadmap",
     title: "Roadmap (timeline)",
     steps: [

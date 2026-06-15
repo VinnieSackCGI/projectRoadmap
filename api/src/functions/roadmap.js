@@ -12,33 +12,27 @@ function getContainerClient() {
   return BlobServiceClient.fromConnectionString(conn).getContainerClient(CONTAINER);
 }
 
+// The shared document is stored verbatim. It is either the multi-roadmap shape
+// { version, roadmaps, data } or the older { tasks, staffing, lanes }; both are
+// handled by the client.
 async function readRoadmap() {
   const blob = getContainerClient().getBlockBlobClient(BLOB);
   if (!(await blob.exists())) {
-    return { tasks: [], staffing: [], lanes: [] };
+    return {};
   }
   const buffer = await blob.downloadToBuffer();
   try {
     const parsed = JSON.parse(buffer.toString("utf8"));
-    return {
-      tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
-      staffing: Array.isArray(parsed.staffing) ? parsed.staffing : [],
-      lanes: Array.isArray(parsed.lanes) ? parsed.lanes : []
-    };
+    return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
-    return { tasks: [], staffing: [], lanes: [] };
+    return {};
   }
 }
 
 async function writeRoadmap(data) {
   const container = getContainerClient();
   await container.createIfNotExists();
-  const body = JSON.stringify({
-    tasks: Array.isArray(data.tasks) ? data.tasks : [],
-    staffing: Array.isArray(data.staffing) ? data.staffing : [],
-    lanes: Array.isArray(data.lanes) ? data.lanes : [],
-    updatedAt: new Date().toISOString()
-  });
+  const body = JSON.stringify({ ...data, updatedAt: new Date().toISOString() });
   await container
     .getBlockBlobClient(BLOB)
     .upload(body, Buffer.byteLength(body), {
