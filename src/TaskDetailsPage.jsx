@@ -17,11 +17,12 @@ import {
 } from "./taskStore";
 import TaskFlags from "./TaskFlags";
 import TaskDocuments from "./TaskDocuments";
+import MilestonesPanel from "./MilestonesPanel";
+import HelpLink from "./HelpLink";
 import {
   createEmptyWorkItemDraft,
   formatDateLabel,
-  parseIsoDate,
-  titleCase
+  parseIsoDate
 } from "./workItemUtils";
 import useWorkItemEditor from "./useWorkItemEditor";
 import backgroundImage from "../design/dos wave background.jpg";
@@ -119,14 +120,6 @@ export default function TaskDetailsPage() {
     () => tasks.find((item) => item.id === taskId) || null,
     [tasks, taskId]
   );
-  const project = useMemo(
-    () => (task?.projectId ? tasks.find((item) => item.id === task.projectId) || null : null),
-    [task, tasks]
-  );
-  const epic = useMemo(
-    () => (task?.epicId ? tasks.find((item) => item.id === task.epicId) || null : null),
-    [task, tasks]
-  );
   const subtasks = useMemo(() => (task ? getSubtasks(task.id) : []), [task, tasks]);
   const risk = task ? assessTaskRisk(task) : null;
   const progress = task ? rollupProgress(task, subtasks) : null;
@@ -136,16 +129,13 @@ export default function TaskDetailsPage() {
     deleteDraftTask,
     draft,
     editorMode,
-    epicOptions,
     isEditorOpen,
     openCreateEditor,
     openEditEditor,
-    projectOptions,
     saveDraft,
     updateDraft,
     validationError
   } = useWorkItemEditor({
-    tasks,
     createEmptyDraft,
     onCreate: storeCreateTask,
     onUpdate: storeUpdateTask,
@@ -161,8 +151,6 @@ export default function TaskDetailsPage() {
       entityType: "task",
       lane: task.lane,
       bureau: task.bureau,
-      projectId: task.projectId || (task.entityType === "project" ? task.id : null),
-      epicId: task.epicId || (task.entityType === "epic" ? task.id : null),
       parentTaskId: task.id,
       startDate: task.startDate,
       endDate: task.endDate,
@@ -190,20 +178,8 @@ export default function TaskDetailsPage() {
               {task.description ? <p className="note">{task.description}</p> : null}
               <div className="detail-grid">
                 <div className="detail-block">
-                  <div className="detail-label">Type</div>
-                  <div className="detail-value">{titleCase(task.entityType)}</div>
-                </div>
-                <div className="detail-block">
                   <div className="detail-label">Bureau</div>
                   <div className="detail-value">{task.bureau}</div>
-                </div>
-                <div className="detail-block">
-                  <div className="detail-label">Project</div>
-                  <div className="detail-value">{project?.task || (task.entityType === "project" ? task.task : "Not linked")}</div>
-                </div>
-                <div className="detail-block">
-                  <div className="detail-label">Epic</div>
-                  <div className="detail-value">{epic?.task || (task.entityType === "epic" ? task.task : "None")}</div>
                 </div>
                 <div className="detail-block">
                   <div className="detail-label">Swim lane</div>
@@ -289,12 +265,6 @@ export default function TaskDetailsPage() {
                     </div>
                   </div>
                 ) : null}
-                {task.milestone ? (
-                  <div className="detail-block">
-                    <div className="detail-label">Milestone</div>
-                    <div className="detail-value">{task.milestone}</div>
-                  </div>
-                ) : null}
                 {task.confidence ? (
                   <div className="detail-block">
                     <div className="detail-label">Confidence</div>
@@ -309,14 +279,18 @@ export default function TaskDetailsPage() {
                 ) : null}
               </div>
 
-              {!task.userGroup || !task.appLink || !task.milestone || !task.description ? (
+              {!task.userGroup || !task.appLink || !task.description ? (
                 <p className="note add-details-hint">
-                  Some optional fields (description, app link, user group, milestone) are empty.{" "}
+                  Some optional fields (description, app link, user group) are empty.{" "}
                   <button type="button" className="link-btn" onClick={() => openEditEditor(task)}>
                     Add details
                   </button>
                 </p>
               ) : null}
+
+              <div className="section-title" style={{ marginTop: 20 }}>Milestones</div>
+              <h2>Milestones &amp; checkpoints</h2>
+              <MilestonesPanel task={task} />
 
               <div className="section-title" style={{ marginTop: 20 }}>Flags</div>
               <h2>Risk & scope flags</h2>
@@ -377,6 +351,7 @@ export default function TaskDetailsPage() {
                 </button>
                 <Link className="secondary-btn inline-action" to="/tasks">Back to Tasks</Link>
                 <Link className="primary-btn inline-action" to="/">Open Roadmap</Link>
+                <HelpLink section="details" />
               </div>
             </>
           )}
@@ -390,8 +365,6 @@ export default function TaskDetailsPage() {
         lanes={lanes}
         bureauOptions={bureauOptions}
         staffing={staffing}
-        projectOptions={projectOptions}
-        epicOptions={epicOptions}
         onChange={updateDraft}
         onCancel={closeEditor}
         onSave={saveDraft}

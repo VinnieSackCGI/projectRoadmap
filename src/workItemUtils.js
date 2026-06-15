@@ -75,6 +75,30 @@ export function titleCase(value) {
     .replace(/\b\w/g, (match) => match.toUpperCase());
 }
 
+export function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function sortMilestones(list) {
+  return [...(Array.isArray(list) ? list : [])].sort((a, b) =>
+    (a.date || "9999-99-99").localeCompare(b.date || "9999-99-99")
+  );
+}
+
+export function summarizeMilestones(task, todayIso = todayIsoDate()) {
+  const list = Array.isArray(task.milestones) ? task.milestones : [];
+  const total = list.length;
+  const done = list.filter((milestone) => milestone.done).length;
+  const overdue = list.filter(
+    (milestone) => !milestone.done && milestone.date && milestone.date < todayIso
+  ).length;
+  const upcoming =
+    sortMilestones(
+      list.filter((milestone) => !milestone.done && (!milestone.date || milestone.date >= todayIso))
+    )[0] || null;
+  return { total, done, open: total - done, overdue, upcoming };
+}
+
 export function createEmptyWorkItemDraft({ lane, bureau, fallbackDate } = {}) {
   const normalizedDate = normalizeDateString(fallbackDate || TIMELINE_START_DATE);
 
@@ -107,26 +131,6 @@ export function createEmptyWorkItemDraft({ lane, bureau, fallbackDate } = {}) {
 
 export function updateWorkItemDraft(previous, field, value) {
   const next = { ...previous, [field]: value };
-
-  if (field === "entityType") {
-    if (value === "project") {
-      next.projectId = null;
-      next.epicId = null;
-      next.parentTaskId = null;
-    } else if (value === "epic") {
-      next.epicId = null;
-    }
-  }
-
-  if (field === "projectId" && next.entityType === "task") {
-    next.epicId = null;
-  }
-
-  next.parentTaskId = next.entityType === "project"
-    ? null
-    : next.entityType === "epic"
-      ? next.projectId || null
-      : next.epicId || next.projectId || null;
 
   next.startDate = normalizeDateString(next.startDate, {
     fallback: TIMELINE_START_DATE,
@@ -181,10 +185,6 @@ export function prepareWorkItemDraftForSave(draft) {
 
   if (endDate < startDate) {
     return { error: "End date cannot be before start date." };
-  }
-
-  if (draft.entityType !== "project" && !draft.projectId) {
-    return { error: "Project selection is required for epics and tasks." };
   }
 
   return {

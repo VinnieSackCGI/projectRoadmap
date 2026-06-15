@@ -18,10 +18,10 @@ import {
 } from "./taskStore";
 import {
   createEmptyWorkItemDraft,
-  formatDateLabel,
-  titleCase
+  formatDateLabel
 } from "./workItemUtils";
 import useWorkItemEditor from "./useWorkItemEditor";
+import HelpLink from "./HelpLink";
 import backgroundImage from "../design/dos wave background.jpg";
 
 const RISK_RANK = { Low: 0, Medium: 1, High: 2 };
@@ -143,16 +143,13 @@ export default function TasksPage() {
     deleteDraftTask,
     draft,
     editorMode,
-    epicOptions,
     isEditorOpen,
     openCreateEditor,
     openEditEditor,
-    projectOptions,
     saveDraft,
     updateDraft,
     validationError
   } = useWorkItemEditor({
-    tasks,
     createEmptyDraft,
     onCreate: storeCreateTask,
     onUpdate: storeUpdateTask,
@@ -244,6 +241,7 @@ export default function TasksPage() {
               <h2>Work Register</h2>
             </div>
             <div className="task-page-actions">
+              <HelpLink section="work-items" />
               <button type="button" className="primary-btn" onClick={openCreateEditor}>
                 Add Work Item
               </button>
@@ -282,7 +280,6 @@ export default function TasksPage() {
                 <tr>
                   {[
                     { key: "name", label: "Name" },
-                    { key: "type", label: "Type" },
                     { key: "owners", label: "Owners" },
                     { key: "bureau", label: "Bureau" },
                     { key: "lane", label: "Swim lane" },
@@ -424,7 +421,7 @@ export default function TasksPage() {
               <tbody>
                 {sortedTasks.length === 0 ? (
                   <tr>
-                    <td className="task-empty-cell" colSpan={10}>
+                    <td className="task-empty-cell" colSpan={9}>
                       No work items match the current filters.
                     </td>
                   </tr>
@@ -442,7 +439,6 @@ export default function TasksPage() {
                           {task.task}
                         </Link>
                       </td>
-                      <td>{titleCase(task.entityType)}</td>
                       <td>{ownerLabel}</td>
                       <td>{task.bureau}</td>
                       <td>{task.lane}</td>
@@ -483,8 +479,6 @@ export default function TasksPage() {
         lanes={lanes}
         bureauOptions={bureauOptions}
         staffing={staffing}
-        projectOptions={projectOptions}
-        epicOptions={epicOptions}
         onChange={updateDraft}
         onCancel={closeEditor}
         onSave={saveDraft}

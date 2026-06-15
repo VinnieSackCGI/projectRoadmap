@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { addLane, moveLane, removeLane, renameLane, reorderLane } from "./taskStore";
+import HelpLink from "./HelpLink";
 
 function LaneRow({
   lane,
@@ -15,14 +16,18 @@ function LaneRow({
 }) {
   const [name, setName] = useState(lane.key);
   const [caption, setCaption] = useState(lane.caption || "");
+  const [color, setColor] = useState(lane.color || "#5c667a");
   const [confirming, setConfirming] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [error, setError] = useState("");
 
-  const dirty = name.trim() !== lane.key || caption !== (lane.caption || "");
+  const dirty =
+    name.trim() !== lane.key ||
+    caption !== (lane.caption || "") ||
+    color !== (lane.color || "#5c667a");
 
   const save = () => {
-    if (!renameLane(lane.key, { key: name, caption })) {
+    if (!renameLane(lane.key, { key: name, caption, color })) {
       setError("Could not save — name is empty or already in use.");
       return;
     }
@@ -85,6 +90,15 @@ function LaneRow({
             <input type="text" value={caption} onChange={(event) => setCaption(event.target.value)} />
           </label>
         </div>
+        <label className="lane-color-field">
+          <span className="lane-color-label">Color</span>
+          <input
+            type="color"
+            value={color}
+            onChange={(event) => setColor(event.target.value)}
+            aria-label={`Color for ${lane.key}`}
+          />
+        </label>
       </div>
 
       <div className="lane-row-actions">
@@ -127,10 +141,11 @@ function LaneRow({
 function AddLaneForm() {
   const [key, setKey] = useState("");
   const [caption, setCaption] = useState("");
+  const [color, setColor] = useState("#0f766e");
   const [error, setError] = useState("");
 
   const add = () => {
-    if (!addLane({ key, caption })) {
+    if (!addLane({ key, caption, color })) {
       setError("Lane name is empty or already in use.");
       return;
     }
@@ -151,6 +166,10 @@ function AddLaneForm() {
           <input type="text" value={caption} onChange={(event) => setCaption(event.target.value)} placeholder="Short description" />
         </label>
       </div>
+      <label className="lane-color-field">
+        <span className="lane-color-label">Color</span>
+        <input type="color" value={color} onChange={(event) => setColor(event.target.value)} aria-label="New lane color" />
+      </label>
       <button type="button" className="primary-btn" onClick={add}>Add lane</button>
       {error ? <p className="error-text">{error}</p> : null}
     </div>
@@ -197,7 +216,10 @@ export default function LaneManagerModal({ open, lanes, onClose }) {
       >
         <div className="modal-header">
           <h3>Manage swim lanes</h3>
-          <button className="secondary-btn" type="button" onClick={onClose}>Close</button>
+          <div className="action-group">
+            <HelpLink section="lanes" />
+            <button className="secondary-btn" type="button" onClick={onClose}>Close</button>
+          </div>
         </div>
 
         <p className="note">

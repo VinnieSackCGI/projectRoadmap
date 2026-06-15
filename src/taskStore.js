@@ -11,6 +11,7 @@ import {
   initialStaffing,
   initialTasks,
   lanes as defaultLanes,
+  LANE_COLOR_PALETTE,
   TASK_ENTITY_TYPES,
   TIMELINE_END_DATE,
   TIMELINE_START_DATE,
@@ -23,15 +24,27 @@ const STAFF_KEY = "project-roadmap-staffing-v2";
 const LANES_KEY = "project-roadmap-lanes-v1";
 const LEGACY_TASKS_KEY = "regional-planning-react-tasks-v1";
 const ROADMAP_DATE_SYNC_KEY = "project-roadmap-date-sync-v1";
+const MILESTONE_SEED_KEY = "project-roadmap-milestone-seed-v1";
+// Multi-roadmap workspaces: one shared document holds every roadmap; the active
+// selection is local to each browser.
+const WORKSPACES_KEY = "project-roadmap-workspaces-v1";
+const ACTIVE_KEY = "project-roadmap-active-roadmap-v1";
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const VALID_ENTITY_TYPES = new Set(TASK_ENTITY_TYPES);
 
 const listeners = new Set();
+// Active-roadmap views (what every hook reads). They always point at the slice
+// for `activeRoadmapId` inside `roadmapData`.
 let tasksState = [];
 let staffingState = [];
 // Seeded with the default lanes so early task normalization always has a valid
 // set to validate against; overwritten from storage during init below.
 let lanesState = defaultLanes.map((lane) => ({ ...lane }));
+
+// Multi-roadmap registry + per-roadmap data.
+let roadmaps = []; // [{ id, name, createdAt }]
+let roadmapData = {}; // { [id]: { tasks, staffing, lanes } }
+let activeRoadmapId = null;
 
 function safeSetItem(key, value) {
   if (typeof window === "undefined") return;
@@ -176,7 +189,9 @@ function withTaskDefaults(task, index = 0) {
     merged.id = `task-${index + 1}`;
   }
   merged.entityType = normalizeEntityType(merged.entityType, inferEntityType(merged));
-  if (!lanesState.some((lane) => lane.key === merged.lane)) {
+  // Only fill a missing lane; keep any non-empty lane as-is so each roadmap's
+  // tasks normalize independently of whichever roadmap is currently active.
+  if (!merged.lane) {
     merged.lane = lanesState[0]?.key || merged.lane;
   }
   // One-time migration: legacy `owners` free-text → ownerIds + externalOwners.
@@ -398,13 +413,41 @@ function loadStaffingFromStorage() {
   return initialStaffing;
 }
 
+// Copy the active-roadmap views back into the workspace document.
+function syncActiveSlice() {
+  if (!activeRoadmapId) return;
+  roadmapData[activeRoadmapId] = {
+    tasks: tasksState,
+    staffing: staffingState,
+    lanes: lanesState
+  };
+}
+
+function saveWorkspacesLocal() {
+  syncActiveSlice();
+  safeSetItem(WORKSPACES_KEY, JSON.stringify({ version: 3, roadmaps, data: roadmapData }));
+}
+
 function persistTasks() {
-  persistTasksLocal();
+  saveWorkspacesLocal();
+  markDirty();
   schedulePush();
 }
 
 function persistTasksLocal() {
-  safeSetItem(TASKS_KEY, JSON.stringify(tasksState));
+  saveWorkspacesLocal();
+}
+
+function normalizeLane(lane, index = 0) {
+  return {
+    key: String(lane.key),
+    caption: String(lane.caption || ""),
+    color: lane.color || LANE_COLOR_PALETTE[index % LANE_COLOR_PALETTE.length]
+  };
+}
+
+function normalizeLaneList(list) {
+  return list.filter((lane) => lane && lane.key).map((lane, index) => normalizeLane(lane, index));
 }
 
 function loadLanesFromStorage() {
@@ -415,30 +458,30 @@ function loadLanesFromStorage() {
   if (raw) {
     const parsed = safeParse(raw);
     if (parsed && parsed.length > 0) {
-      return parsed
-        .filter((lane) => lane && lane.key)
-        .map((lane) => ({ key: String(lane.key), caption: String(lane.caption || "") }));
+      return normalizeLaneList(parsed);
     }
   }
   return defaultLanes.map((lane) => ({ ...lane }));
 }
 
 function persistLanesLocal() {
-  safeSetItem(LANES_KEY, JSON.stringify(lanesState));
+  saveWorkspacesLocal();
 }
 
 function persistLanes() {
-  persistLanesLocal();
+  saveWorkspacesLocal();
+  markDirty();
   schedulePush();
 }
 
 function persistStaffing() {
-  persistStaffingLocal();
+  saveWorkspacesLocal();
+  markDirty();
   schedulePush();
 }
 
 function persistStaffingLocal() {
-  safeSetItem(STAFF_KEY, JSON.stringify(staffingState));
+  saveWorkspacesLocal();
 }
 
 // --- Shared-roadmap sync (Azure Static Web Apps /api/roadmap) ---
@@ -446,65 +489,334 @@ function persistStaffingLocal() {
 // behaves exactly as before and persists to localStorage only.
 let remoteAvailable = false;
 
+// Roadmap ids changed locally since the last confirmed sync. On a write
+// conflict, only these slices override the freshly fetched remote ones, so
+// concurrent edits to *other* roadmaps survive.
+const dirtyRoadmaps = new Set();
+
+function markDirty(id = activeRoadmapId) {
+  if (id) dirtyRoadmaps.add(id);
+}
+
+function currentWorkspaceDoc() {
+  syncActiveSlice();
+  return { version: 3, roadmaps, data: roadmapData };
+}
+
+// Merge a freshly fetched remote document into local state at roadmap
+// granularity: keep our dirty roadmaps, take remote for everything else, and
+// union the registry. Returns the merged document to write back.
+function reconcileWithRemote(remoteDoc) {
+  const remote =
+    remoteDoc && Array.isArray(remoteDoc.roadmaps) && remoteDoc.roadmaps.length > 0 && remoteDoc.data
+      ? normalizeWorkspaceDoc(remoteDoc)
+      : { roadmaps: [], data: {} };
+
+  const byId = new Map();
+  remote.roadmaps.forEach((roadmap) => byId.set(roadmap.id, { ...roadmap }));
+  roadmaps.forEach((roadmap) => {
+    if (!byId.has(roadmap.id)) {
+      byId.set(roadmap.id, { ...roadmap }); // created locally
+    } else if (dirtyRoadmaps.has(roadmap.id)) {
+      byId.set(roadmap.id, { ...byId.get(roadmap.id), name: roadmap.name }); // our rename wins
+    }
+  });
+
+  const mergedRoadmaps = [...byId.values()];
+  const mergedData = {};
+  mergedRoadmaps.forEach((roadmap) => {
+    const localSlice = roadmapData[roadmap.id];
+    const remoteSlice = remote.data[roadmap.id];
+    if (dirtyRoadmaps.has(roadmap.id) && localSlice) {
+      mergedData[roadmap.id] = localSlice;
+    } else if (remoteSlice) {
+      mergedData[roadmap.id] = remoteSlice;
+    } else {
+      mergedData[roadmap.id] = localSlice || normalizeRoadmapSlice();
+    }
+  });
+
+  roadmaps = mergedRoadmaps;
+  roadmapData = mergedData;
+  if (!roadmapData[activeRoadmapId]) {
+    activeRoadmapId = roadmaps[0].id;
+    if (typeof window !== "undefined") window.localStorage.setItem(ACTIVE_KEY, activeRoadmapId);
+  }
+  applyActiveRoadmap();
+  saveWorkspacesLocal();
+  dirtyRoadmaps.clear();
+  emit();
+  return { version: 3, roadmaps, data: roadmapData };
+}
+
 function schedulePush() {
   if (!remoteAvailable) return;
-  pushRemoteRoadmap(() => ({ tasks: tasksState, staffing: staffingState, lanes: lanesState }));
+  pushRemoteRoadmap(currentWorkspaceDoc, {
+    onConflict: reconcileWithRemote,
+    onSuccess: () => dirtyRoadmaps.clear()
+  });
+}
+
+function normalizeRoadmapSlice(slice = {}) {
+  return {
+    tasks: normalizeTaskCollection(Array.isArray(slice.tasks) ? slice.tasks : []),
+    staffing: Array.isArray(slice.staffing) ? slice.staffing : [],
+    lanes: normalizeLaneList(
+      Array.isArray(slice.lanes) && slice.lanes.length ? slice.lanes : defaultLanes
+    )
+  };
+}
+
+function normalizeWorkspaceDoc(doc) {
+  const list = doc.roadmaps
+    .filter((roadmap) => roadmap && roadmap.id)
+    .map((roadmap) => ({
+      id: String(roadmap.id),
+      name: String(roadmap.name || "Untitled roadmap"),
+      createdAt: roadmap.createdAt || null
+    }));
+  const data = {};
+  list.forEach((roadmap) => {
+    data[roadmap.id] = normalizeRoadmapSlice((doc.data || {})[roadmap.id]);
+  });
+  return { roadmaps: list, data };
 }
 
 async function hydrateFromRemote() {
-  const remote = await fetchRemoteRoadmap();
-  if (!remote) {
+  const fetched = await fetchRemoteRoadmap();
+  if (!fetched) {
     // No API reachable (local dev / offline) — stay in localStorage-only mode.
     return;
   }
 
   remoteAvailable = true;
-  let changed = false;
-  let remoteWasEmpty = true;
+  const remote = fetched.doc;
 
-  // Lanes first, so incoming tasks validate against the shared lane set.
-  if (Array.isArray(remote.lanes) && remote.lanes.length > 0) {
-    lanesState = remote.lanes
-      .filter((lane) => lane && lane.key)
-      .map((lane) => ({ key: String(lane.key), caption: String(lane.caption || "") }));
-    persistLanesLocal();
-    changed = true;
-    remoteWasEmpty = false;
+  if (Array.isArray(remote.roadmaps) && remote.roadmaps.length > 0 && remote.data) {
+    const ws = normalizeWorkspaceDoc(remote);
+    roadmaps = ws.roadmaps;
+    roadmapData = ws.data;
+    if (!roadmapData[activeRoadmapId]) {
+      activeRoadmapId = roadmaps[0].id;
+      if (typeof window !== "undefined") window.localStorage.setItem(ACTIVE_KEY, activeRoadmapId);
+    }
+    applyActiveRoadmap();
+    saveWorkspacesLocal();
+    emit();
+    return;
   }
 
-  if (remote.tasks.length > 0) {
-    tasksState = normalizeTaskCollection(remote.tasks);
-    persistTasksLocal();
-    changed = true;
-    remoteWasEmpty = false;
-  }
-
-  if (remote.staffing.length > 0) {
-    staffingState = remote.staffing;
-    persistStaffingLocal();
-    changed = true;
-    remoteWasEmpty = false;
-  }
-
-  if (remoteWasEmpty) {
-    // First deploy: seed the shared store from whatever this client has.
+  // Legacy single-roadmap remote shape → fold into the first roadmap.
+  const legacyTasks = Array.isArray(remote.tasks) ? remote.tasks : [];
+  const legacyStaffing = Array.isArray(remote.staffing) ? remote.staffing : [];
+  const legacyLanes = Array.isArray(remote.lanes) ? remote.lanes : [];
+  if (legacyTasks.length || legacyStaffing.length || legacyLanes.length) {
+    const id = roadmaps[0].id;
+    const current = roadmapData[id] || normalizeRoadmapSlice();
+    roadmapData[id] = normalizeRoadmapSlice({
+      tasks: legacyTasks.length ? legacyTasks : current.tasks,
+      staffing: legacyStaffing.length ? legacyStaffing : current.staffing,
+      lanes: legacyLanes.length ? legacyLanes : current.lanes
+    });
+    if (activeRoadmapId === id) applyActiveRoadmap();
+    saveWorkspacesLocal();
+    emit();
+  } else {
+    // Remote empty → seed the shared store from this client.
     schedulePush();
   }
-
-  if (changed) emit();
 }
 
 function emit() {
   listeners.forEach((fn) => fn());
 }
 
-lanesState = loadLanesFromStorage();
-tasksState = loadTasksFromStorage();
-staffingState = loadStaffingFromStorage();
+// One-time migration: turn each item's legacy `milestone` headline into a
+// structured milestone so the new milestone list isn't empty on first run.
+function maybeSeedMilestones(tasks) {
+  if (typeof window === "undefined") return tasks;
+  if (window.localStorage.getItem(MILESTONE_SEED_KEY)) return tasks;
+
+  let changed = false;
+  const seeded = tasks.map((task) => {
+    const list = Array.isArray(task.milestones) ? task.milestones : [];
+    if (list.length === 0 && task.milestone) {
+      changed = true;
+      return {
+        ...task,
+        milestones: [
+          {
+            id: generateId("ms"),
+            title: task.milestone,
+            date: task.dueDate || task.endDate || "",
+            done: false
+          }
+        ]
+      };
+    }
+    return task;
+  });
+
+  if (changed) safeSetItem(TASKS_KEY, JSON.stringify(seeded));
+  window.localStorage.setItem(MILESTONE_SEED_KEY, "1");
+  return changed ? seeded : tasks;
+}
+
+function makeRoadmapId() {
+  return generateId("rm");
+}
+
+function buildDefaultWorkspace() {
+  const tasks = maybeSeedMilestones(loadTasksFromStorage());
+  const lanes = loadLanesFromStorage();
+  const staffing = loadStaffingFromStorage();
+  const id = "default";
+  return {
+    roadmaps: [{ id, name: "Regional Roadmap", createdAt: new Date().toISOString() }],
+    data: { [id]: { tasks, staffing, lanes } }
+  };
+}
+
+function loadWorkspaces() {
+  if (typeof window === "undefined") {
+    const id = "default";
+    return {
+      roadmaps: [{ id, name: "Regional Roadmap", createdAt: null }],
+      data: {
+        [id]: {
+          tasks: normalizeTaskCollection(initialTasks),
+          staffing: initialStaffing,
+          lanes: defaultLanes.map((lane) => ({ ...lane }))
+        }
+      }
+    };
+  }
+
+  const raw = window.localStorage.getItem(WORKSPACES_KEY);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.roadmaps) && parsed.roadmaps.length > 0 && parsed.data) {
+        return normalizeWorkspaceDoc(parsed);
+      }
+    } catch {
+      // fall through to legacy migration
+    }
+  }
+
+  // First run on this browser → migrate the legacy single-roadmap keys.
+  const built = buildDefaultWorkspace();
+  safeSetItem(WORKSPACES_KEY, JSON.stringify({ version: 3, ...built }));
+  return built;
+}
+
+function applyActiveRoadmap() {
+  const slice = roadmapData[activeRoadmapId] || normalizeRoadmapSlice();
+  tasksState = slice.tasks;
+  staffingState = slice.staffing;
+  lanesState = slice.lanes;
+}
+
+(function initWorkspaces() {
+  const ws = loadWorkspaces();
+  roadmaps = ws.roadmaps;
+  roadmapData = ws.data;
+  const savedActive = typeof window !== "undefined" ? window.localStorage.getItem(ACTIVE_KEY) : null;
+  activeRoadmapId =
+    savedActive && roadmaps.some((roadmap) => roadmap.id === savedActive)
+      ? savedActive
+      : roadmaps[0].id;
+  applyActiveRoadmap();
+})();
 
 if (typeof window !== "undefined") {
   // Pull the shared copy (and seed it on first deploy). Safe no-op in local dev.
   hydrateFromRemote();
+}
+
+// --- Roadmap workspaces (create / switch / rename / delete) ---
+
+export function getRoadmaps() {
+  return roadmaps;
+}
+
+export function getActiveRoadmapId() {
+  return activeRoadmapId;
+}
+
+export function getActiveRoadmap() {
+  return roadmaps.find((roadmap) => roadmap.id === activeRoadmapId) || null;
+}
+
+export function switchRoadmap(id) {
+  if (id === activeRoadmapId || !roadmapData[id]) return false;
+  syncActiveSlice();
+  activeRoadmapId = id;
+  if (typeof window !== "undefined") window.localStorage.setItem(ACTIVE_KEY, id);
+  applyActiveRoadmap();
+  emit();
+  return true;
+}
+
+export function createRoadmap(name) {
+  const id = makeRoadmapId();
+  const trimmed = (name || "").trim() || "Untitled roadmap";
+  roadmaps = [...roadmaps, { id, name: trimmed, createdAt: new Date().toISOString() }];
+  roadmapData[id] = {
+    tasks: [],
+    staffing: [],
+    lanes: defaultLanes.map((lane, index) => normalizeLane(lane, index))
+  };
+  saveWorkspacesLocal();
+  markDirty(id);
+  schedulePush();
+  emit();
+  return id;
+}
+
+export function renameRoadmap(id, name) {
+  const trimmed = (name || "").trim();
+  if (!trimmed) return false;
+  if (!roadmaps.some((roadmap) => roadmap.id === id)) return false;
+  roadmaps = roadmaps.map((roadmap) =>
+    roadmap.id === id ? { ...roadmap, name: trimmed } : roadmap
+  );
+  saveWorkspacesLocal();
+  markDirty(id);
+  schedulePush();
+  emit();
+  return true;
+}
+
+export function deleteRoadmap(id) {
+  if (roadmaps.length <= 1) return false;
+  if (!roadmapData[id]) return false;
+  roadmaps = roadmaps.filter((roadmap) => roadmap.id !== id);
+  delete roadmapData[id];
+  if (activeRoadmapId === id) {
+    activeRoadmapId = roadmaps[0].id;
+    if (typeof window !== "undefined") window.localStorage.setItem(ACTIVE_KEY, activeRoadmapId);
+    applyActiveRoadmap();
+  }
+  saveWorkspacesLocal();
+  schedulePush();
+  emit();
+  return true;
+}
+
+// Read-only snapshot of every roadmap's data for the cross-roadmap total view.
+export function getRoadmapPortfolio() {
+  syncActiveSlice();
+  return roadmaps.map((roadmap) => {
+    const slice = roadmapData[roadmap.id] || { tasks: [], staffing: [], lanes: [] };
+    return {
+      id: roadmap.id,
+      name: roadmap.name,
+      tasks: slice.tasks,
+      staffing: slice.staffing,
+      lanes: slice.lanes
+    };
+  });
 }
 
 export function subscribe(fn) {
@@ -514,18 +826,6 @@ export function subscribe(fn) {
 
 export function getTasks() {
   return tasksState;
-}
-
-export function getProjects() {
-  return tasksState.filter((task) => task.entityType === "project");
-}
-
-export function getEpics() {
-  return tasksState.filter((task) => task.entityType === "epic");
-}
-
-export function getTaskItems() {
-  return tasksState.filter((task) => task.entityType === "task");
 }
 
 export function getStaffing() {
@@ -657,7 +957,8 @@ export function exportRoadmap() {
     version: 2,
     exportedAt: new Date().toISOString(),
     tasks: getTasks(),
-    staffing: getStaffing()
+    staffing: getStaffing(),
+    lanes: getLanes()
   };
 }
 
@@ -665,7 +966,12 @@ export function importRoadmap(payload) {
   if (!payload || typeof payload !== "object") return false;
   const nextTasks = Array.isArray(payload.tasks) ? payload.tasks : null;
   const nextStaffing = Array.isArray(payload.staffing) ? payload.staffing : null;
-  if (!nextTasks && !nextStaffing) return false;
+  const nextLanes = Array.isArray(payload.lanes) ? payload.lanes : null;
+  if (!nextTasks && !nextStaffing && !nextLanes) return false;
+  if (nextLanes) {
+    lanesState = normalizeLaneList(nextLanes);
+    persistLanes();
+  }
   if (nextTasks) {
     tasksState = normalizeTaskCollection(nextTasks);
     persistTasks();
@@ -680,19 +986,26 @@ export function importRoadmap(payload) {
 
 // --- Swim lane management (PM/Admin) ---
 
-export function addLane({ key, caption } = {}) {
+export function addLane({ key, caption, color } = {}) {
   const trimmed = (key || "").trim();
   if (!trimmed) return false;
   if (lanesState.some((lane) => lane.key.toLowerCase() === trimmed.toLowerCase())) {
     return false;
   }
-  lanesState = [...lanesState, { key: trimmed, caption: (caption || "").trim() }];
+  lanesState = [
+    ...lanesState,
+    {
+      key: trimmed,
+      caption: (caption || "").trim(),
+      color: color || LANE_COLOR_PALETTE[lanesState.length % LANE_COLOR_PALETTE.length]
+    }
+  ];
   persistLanes();
   emit();
   return true;
 }
 
-export function renameLane(oldKey, { key, caption } = {}) {
+export function renameLane(oldKey, { key, caption, color } = {}) {
   const trimmed = (key || "").trim();
   if (!trimmed) return false;
   const existing = lanesState.find((lane) => lane.key === oldKey);
@@ -705,7 +1018,11 @@ export function renameLane(oldKey, { key, caption } = {}) {
   }
   lanesState = lanesState.map((lane) =>
     lane.key === oldKey
-      ? { key: trimmed, caption: caption !== undefined ? caption : lane.caption }
+      ? {
+          key: trimmed,
+          caption: caption !== undefined ? caption : lane.caption,
+          color: color !== undefined ? color : lane.color
+        }
       : lane
   );
   if (trimmed !== oldKey) {
@@ -783,6 +1100,39 @@ export function removeTaskDocument(taskId, docId) {
   return updateTask(taskId, { documents });
 }
 
+// --- Milestones ---
+
+export function addMilestone(taskId, { title, date } = {}) {
+  const task = getTask(taskId);
+  if (!task) return null;
+  const entry = {
+    id: generateId("ms"),
+    title: (title || "").trim() || "Milestone",
+    date: date || "",
+    done: false
+  };
+  const list = Array.isArray(task.milestones) ? task.milestones : [];
+  return updateTask(taskId, { milestones: [...list, entry] });
+}
+
+export function updateMilestone(taskId, milestoneId, patch = {}) {
+  const task = getTask(taskId);
+  if (!task) return null;
+  const list = (Array.isArray(task.milestones) ? task.milestones : []).map((milestone) =>
+    milestone.id === milestoneId ? { ...milestone, ...patch } : milestone
+  );
+  return updateTask(taskId, { milestones: list });
+}
+
+export function removeMilestone(taskId, milestoneId) {
+  const task = getTask(taskId);
+  if (!task) return null;
+  const list = (Array.isArray(task.milestones) ? task.milestones : []).filter(
+    (milestone) => milestone.id !== milestoneId
+  );
+  return updateTask(taskId, { milestones: list });
+}
+
 // --- Risk + burnout heuristics (used by UI badges and by the PM agent) ---
 
 export function assessTaskRisk(task) {
@@ -824,6 +1174,15 @@ export function assessTaskRisk(task) {
   if (spanDays > 365 && status !== "done") {
     score += 1;
     reasons.push("Spans more than one year");
+  }
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const overdueMilestones = (Array.isArray(task.milestones) ? task.milestones : []).filter(
+    (milestone) => !milestone.done && milestone.date && milestone.date < todayIso
+  ).length;
+  if (overdueMilestones > 0 && status !== "done") {
+    score += 1;
+    reasons.push(`${overdueMilestones} overdue milestone${overdueMilestones === 1 ? "" : "s"}`);
   }
 
   let level = "Low";
@@ -909,18 +1268,6 @@ export function useTasks() {
   return useSyncExternalStore(subscribe, getTasks, getTasks);
 }
 
-export function useProjects() {
-  return useSyncExternalStore(subscribe, getProjects, getProjects);
-}
-
-export function useEpics() {
-  return useSyncExternalStore(subscribe, getEpics, getEpics);
-}
-
-export function useTaskItems() {
-  return useSyncExternalStore(subscribe, getTaskItems, getTaskItems);
-}
-
 export function useStaffing() {
   return useSyncExternalStore(subscribe, getStaffing, getStaffing);
 }
@@ -929,15 +1276,20 @@ export function useLanes() {
   return useSyncExternalStore(subscribe, getLanes, getLanes);
 }
 
+export function useRoadmaps() {
+  return useSyncExternalStore(subscribe, getRoadmaps, getRoadmaps);
+}
+
+export function useActiveRoadmapId() {
+  return useSyncExternalStore(subscribe, getActiveRoadmapId, getActiveRoadmapId);
+}
+
 // --- Agent surface ---
 // A future PM agent can call these from the browser console or via an injected
 // chat panel. Keep the surface narrow and JSON-friendly.
 if (typeof window !== "undefined") {
   window.projectRoadmap = {
     listTasks: () => getTasks().map((task) => ({ ...task })),
-    listProjects: () => getProjects().map((task) => ({ ...task })),
-    listEpics: () => getEpics().map((task) => ({ ...task })),
-    listTaskItems: () => getTaskItems().map((task) => ({ ...task })),
     getTask: (id) => {
       const task = getTask(id);
       return task ? { ...task } : null;
@@ -960,6 +1312,9 @@ if (typeof window !== "undefined") {
     resolveTaskFlag,
     addTaskDocument,
     removeTaskDocument,
+    addMilestone,
+    updateMilestone,
+    removeMilestone,
     listLanes: () => getLanes().map((lane) => ({ ...lane })),
     addLane,
     renameLane,
@@ -968,6 +1323,12 @@ if (typeof window !== "undefined") {
     reorderLane,
     exportRoadmap,
     importRoadmap,
+    listRoadmaps: () => getRoadmaps().map((roadmap) => ({ ...roadmap })),
+    getActiveRoadmapId,
+    switchRoadmap,
+    createRoadmap,
+    renameRoadmap,
+    deleteRoadmap,
     assessTaskRisk: (idOrTask) => {
       const task = typeof idOrTask === "string" ? getTask(idOrTask) : idOrTask;
       return task ? assessTaskRisk(task) : null;

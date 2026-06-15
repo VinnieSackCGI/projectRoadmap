@@ -33,11 +33,14 @@ import {
 } from "./taskStore";
 import TaskFlags from "./TaskFlags";
 import LaneManagerModal from "./LaneManagerModal";
+import HelpLink from "./HelpLink";
 import {
   createEmptyWorkItemDraft,
   formatDateLabel,
   normalizeDateString,
   parseIsoDate,
+  sortMilestones,
+  summarizeMilestones,
   toIsoDate,
 } from "./workItemUtils";
 import useWorkItemEditor from "./useWorkItemEditor";
@@ -303,7 +306,7 @@ function LaneTrack({
     <>
       <div
         className={`lane-name ${laneIndex % 2 === 1 ? "alt" : ""} ${collapsed ? "is-collapsed" : ""}`}
-        style={{ minHeight: `${laneHeight}px` }}
+        style={{ minHeight: `${laneHeight}px`, borderLeft: `5px solid ${lane.color || "transparent"}` }}
       >
         <button
           type="button"
@@ -315,7 +318,10 @@ function LaneTrack({
           {collapsed ? "▸" : "▾"}
         </button>
         <div className="lane-name-text">
-          <div className="lane-title">{lane.key}</div>
+          <div className="lane-title">
+            <span className="lane-color-dot" style={{ background: lane.color || "var(--muted)" }} aria-hidden="true" />
+            {lane.key}
+          </div>
           {collapsed ? (
             <div className="lane-caption">{laneTasks.length} item{laneTasks.length === 1 ? "" : "s"}</div>
           ) : (
@@ -343,6 +349,7 @@ function LaneTrack({
           const x = start * unitWidth + BAR_HORIZONTAL_INSET;
           const y = TASK_TOP_PADDING + rowIndex * TASK_ROW_HEIGHT;
           const openFlagCount = getOpenFlags(task).length;
+          const ms = summarizeMilestones(task);
 
           return (
             <Rnd
@@ -386,9 +393,21 @@ function LaneTrack({
                 }}
               >
                 <span className="task-bar-accent" aria-hidden="true" />
-                {openFlagCount > 0 ? (
-                  <span className="task-flag-badge" title={`${openFlagCount} open flag${openFlagCount === 1 ? "" : "s"}`}>
-                    ⚑ {openFlagCount}
+                {openFlagCount > 0 || ms.total > 0 ? (
+                  <span className="task-bar-badges">
+                    {ms.total > 0 ? (
+                      <span
+                        className={`task-ms-badge ${ms.overdue > 0 ? "is-overdue" : ""}`}
+                        title={`${ms.done}/${ms.total} milestones done${ms.overdue > 0 ? `, ${ms.overdue} overdue` : ""}`}
+                      >
+                        ◆ {ms.done}/{ms.total}
+                      </span>
+                    ) : null}
+                    {openFlagCount > 0 ? (
+                      <span className="task-flag-badge" title={`${openFlagCount} open flag${openFlagCount === 1 ? "" : "s"}`}>
+                        ⚑ {openFlagCount}
+                      </span>
+                    ) : null}
                   </span>
                 ) : null}
                 <span className="task-title">{task.task}</span>
@@ -597,7 +616,11 @@ function AssignmentHub({
           <div
             key={lane.key}
             className="hub-lane-badge"
-            style={{ left: `${lane.left}%`, top: `${lane.top}%` }}
+            style={{
+              left: `${lane.left}%`,
+              top: `${lane.top}%`,
+              background: lane.color || undefined
+            }}
           >
             {lane.key}
           </div>
@@ -900,16 +923,13 @@ export default function App() {
     deleteDraftTask,
     draft,
     editorMode,
-    epicOptions,
     isEditorOpen,
     openCreateEditor,
     openEditEditor,
-    projectOptions,
     saveDraft,
     updateDraft,
     validationError
   } = useWorkItemEditor({
-    tasks,
     createEmptyDraft,
     onCreate: (normalized) => {
       const created = storeCreateTask(normalized);
@@ -1012,6 +1032,7 @@ export default function App() {
 
       return {
         key: lane.key,
+        color: lane.color,
         left: (laneCenterPoint.x / HUB_VIEWBOX_WIDTH) * 100,
         top: (laneCenterPoint.y / HUB_VIEWBOX_HEIGHT) * 100
       };
@@ -1374,6 +1395,7 @@ export default function App() {
               <h2>Roadmap</h2>
             </div>
             <div className="roadmap-header-actions">
+              <HelpLink section="roadmap" />
               <div className="zoom-controls" role="group" aria-label="Timeline zoom">
                 <span className="zoom-label">Zoom</span>
                 {ZOOM_LEVELS.map((level) => (
@@ -1564,6 +1586,40 @@ export default function App() {
                       </div>
                     ) : null}
                     <div className="detail-block">
+                      <div className="detail-label">Milestones</div>
+                      <div className="detail-value">
+                        {(() => {
+                          const list = sortMilestones(activeTask.milestones);
+                          if (list.length === 0) {
+                            return "None yet";
+                          }
+                          const todayIso = toIsoDate(new Date());
+                          return (
+                            <ul className="card-milestone-list">
+                              {list.map((milestone) => {
+                                const overdue =
+                                  !milestone.done && milestone.date && milestone.date < todayIso;
+                                return (
+                                  <li
+                                    key={milestone.id}
+                                    className={`card-milestone ${milestone.done ? "is-done" : ""} ${overdue ? "is-overdue" : ""}`}
+                                  >
+                                    <span className="card-ms-mark" aria-hidden="true">
+                                      {milestone.done ? "✓" : "◆"}
+                                    </span>
+                                    <span className="card-ms-title">{milestone.title}</span>
+                                    <span className="card-ms-date">
+                                      {milestone.date ? formatDateLabel(milestone.date) : "—"}
+                                    </span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                    <div className="detail-block">
                       <div className="detail-label">Flags</div>
                       <TaskFlags task={activeTask} compact />
                     </div>
@@ -1631,8 +1687,6 @@ export default function App() {
         lanes={lanes}
         bureauOptions={bureauOptions}
         staffing={staffing}
-        projectOptions={projectOptions}
-        epicOptions={epicOptions}
         onChange={updateDraft}
         onCancel={closeEditor}
         onSave={saveDraft}

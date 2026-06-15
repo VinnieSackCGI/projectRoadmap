@@ -1,11 +1,9 @@
 import React from "react";
 import {
-  TASK_ENTITY_TYPES,
   TASK_PRIORITIES,
   TASK_RISK_LEVELS,
   TASK_STATUSES
 } from "./data";
-import { titleCase } from "./workItemUtils";
 
 export default function TaskEditorModal({
   open,
@@ -14,8 +12,6 @@ export default function TaskEditorModal({
   lanes,
   bureauOptions,
   staffing = [],
-  projectOptions = [],
-  epicOptions = [],
   onChange,
   onCancel,
   onSave,
@@ -48,57 +44,15 @@ export default function TaskEditorModal({
         </div>
 
         <div className="modal-grid">
-          <label>
-            Item type
-            <select
-              value={draft.entityType || "task"}
-              onChange={(event) => onChange("entityType", event.target.value)}
-            >
-              {TASK_ENTITY_TYPES.map((value) => (
-                <option key={value} value={value}>{titleCase(value)}</option>
-              ))}
-            </select>
-          </label>
-
-          <label>
+          <label className="modal-grid-full">
             Item name
             <input
               type="text"
               value={draft.task}
               onChange={(event) => onChange("task", event.target.value)}
-              placeholder="Project, epic, or task title"
+              placeholder="Work item title"
             />
           </label>
-
-          {draft.entityType !== "project" ? (
-            <label>
-              Project
-              <select
-                value={draft.projectId || ""}
-                onChange={(event) => onChange("projectId", event.target.value || null)}
-              >
-                <option value="">Select project</option>
-                {projectOptions.map((project) => (
-                  <option key={project.id} value={project.id}>{project.task}</option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-
-          {draft.entityType === "task" ? (
-            <label>
-              Epic
-              <select
-                value={draft.epicId || ""}
-                onChange={(event) => onChange("epicId", event.target.value || null)}
-              >
-                <option value="">No epic</option>
-                {epicOptions.map((epic) => (
-                  <option key={epic.id} value={epic.id}>{epic.task}</option>
-                ))}
-              </select>
-            </label>
-          ) : null}
 
           <label>
             Swim lane
@@ -242,16 +196,6 @@ export default function TaskEditorModal({
               value={draft.appLink || ""}
               onChange={(event) => onChange("appLink", event.target.value)}
               placeholder="https://"
-            />
-          </label>
-
-          <label>
-            Milestone summary
-            <input
-              type="text"
-              value={draft.milestone || ""}
-              onChange={(event) => onChange("milestone", event.target.value)}
-              placeholder="Headline milestone"
             />
           </label>
 

@@ -5,6 +5,8 @@ import TasksPage from "./TasksPage";
 import TaskDetailsPage from "./TaskDetailsPage";
 import StaffingPage from "./StaffingPage";
 import ExecutiveDashboardPage from "./ExecutiveDashboardPage";
+import PortfolioPage from "./PortfolioPage";
+import HelpPage from "./HelpPage";
 import "./App.css";
 
 export default function RootApp() {
@@ -15,6 +17,8 @@ export default function RootApp() {
       <Route path="/tasks/:taskId" element={<TaskDetailsPage />} />
       <Route path="/staffing" element={<StaffingPage />} />
       <Route path="/executive" element={<ExecutiveDashboardPage />} />
+      <Route path="/portfolio" element={<PortfolioPage />} />
+      <Route path="/help" element={<HelpPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

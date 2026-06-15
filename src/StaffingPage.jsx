@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import AppHeader from "./AppHeader";
 import { assessStaffBurnout, useStaffing, useTasks } from "./taskStore";
+import HelpLink from "./HelpLink";
 import backgroundImage from "../design/dos wave background.jpg";
 
 function levelTone(level) {
@@ -85,8 +86,13 @@ export default function StaffingPage() {
 
       <main className="shell">
         <section className="staffing card page-panel">
-          <div className="section-title">Overlay</div>
-          <h2>Staffing capacity and burnout signals</h2>
+          <div className="page-head-row">
+            <div>
+              <div className="section-title">Overlay</div>
+              <h2>Staffing capacity and burnout signals</h2>
+            </div>
+            <HelpLink section="staffing" />
+          </div>
           <p className="note">
             Capacity values are seed estimates. The burnout level is derived from declared
             allocation and active task ownership across the roadmap.
