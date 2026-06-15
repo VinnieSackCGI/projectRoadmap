@@ -430,6 +430,7 @@ function saveWorkspacesLocal() {
 
 function persistTasks() {
   saveWorkspacesLocal();
+  markDirty();
   schedulePush();
 }
 
@@ -469,11 +470,13 @@ function persistLanesLocal() {
 
 function persistLanes() {
   saveWorkspacesLocal();
+  markDirty();
   schedulePush();
 }
 
 function persistStaffing() {
   saveWorkspacesLocal();
+  markDirty();
   schedulePush();
 }
 
@@ -486,11 +489,71 @@ function persistStaffingLocal() {
 // behaves exactly as before and persists to localStorage only.
 let remoteAvailable = false;
 
+// Roadmap ids changed locally since the last confirmed sync. On a write
+// conflict, only these slices override the freshly fetched remote ones, so
+// concurrent edits to *other* roadmaps survive.
+const dirtyRoadmaps = new Set();
+
+function markDirty(id = activeRoadmapId) {
+  if (id) dirtyRoadmaps.add(id);
+}
+
+function currentWorkspaceDoc() {
+  syncActiveSlice();
+  return { version: 3, roadmaps, data: roadmapData };
+}
+
+// Merge a freshly fetched remote document into local state at roadmap
+// granularity: keep our dirty roadmaps, take remote for everything else, and
+// union the registry. Returns the merged document to write back.
+function reconcileWithRemote(remoteDoc) {
+  const remote =
+    remoteDoc && Array.isArray(remoteDoc.roadmaps) && remoteDoc.roadmaps.length > 0 && remoteDoc.data
+      ? normalizeWorkspaceDoc(remoteDoc)
+      : { roadmaps: [], data: {} };
+
+  const byId = new Map();
+  remote.roadmaps.forEach((roadmap) => byId.set(roadmap.id, { ...roadmap }));
+  roadmaps.forEach((roadmap) => {
+    if (!byId.has(roadmap.id)) {
+      byId.set(roadmap.id, { ...roadmap }); // created locally
+    } else if (dirtyRoadmaps.has(roadmap.id)) {
+      byId.set(roadmap.id, { ...byId.get(roadmap.id), name: roadmap.name }); // our rename wins
+    }
+  });
+
+  const mergedRoadmaps = [...byId.values()];
+  const mergedData = {};
+  mergedRoadmaps.forEach((roadmap) => {
+    const localSlice = roadmapData[roadmap.id];
+    const remoteSlice = remote.data[roadmap.id];
+    if (dirtyRoadmaps.has(roadmap.id) && localSlice) {
+      mergedData[roadmap.id] = localSlice;
+    } else if (remoteSlice) {
+      mergedData[roadmap.id] = remoteSlice;
+    } else {
+      mergedData[roadmap.id] = localSlice || normalizeRoadmapSlice();
+    }
+  });
+
+  roadmaps = mergedRoadmaps;
+  roadmapData = mergedData;
+  if (!roadmapData[activeRoadmapId]) {
+    activeRoadmapId = roadmaps[0].id;
+    if (typeof window !== "undefined") window.localStorage.setItem(ACTIVE_KEY, activeRoadmapId);
+  }
+  applyActiveRoadmap();
+  saveWorkspacesLocal();
+  dirtyRoadmaps.clear();
+  emit();
+  return { version: 3, roadmaps, data: roadmapData };
+}
+
 function schedulePush() {
   if (!remoteAvailable) return;
-  pushRemoteRoadmap(() => {
-    syncActiveSlice();
-    return { version: 3, roadmaps, data: roadmapData };
+  pushRemoteRoadmap(currentWorkspaceDoc, {
+    onConflict: reconcileWithRemote,
+    onSuccess: () => dirtyRoadmaps.clear()
   });
 }
 
@@ -520,13 +583,14 @@ function normalizeWorkspaceDoc(doc) {
 }
 
 async function hydrateFromRemote() {
-  const remote = await fetchRemoteRoadmap();
-  if (!remote) {
+  const fetched = await fetchRemoteRoadmap();
+  if (!fetched) {
     // No API reachable (local dev / offline) — stay in localStorage-only mode.
     return;
   }
 
   remoteAvailable = true;
+  const remote = fetched.doc;
 
   if (Array.isArray(remote.roadmaps) && remote.roadmaps.length > 0 && remote.data) {
     const ws = normalizeWorkspaceDoc(remote);
@@ -704,6 +768,7 @@ export function createRoadmap(name) {
     lanes: defaultLanes.map((lane, index) => normalizeLane(lane, index))
   };
   saveWorkspacesLocal();
+  markDirty(id);
   schedulePush();
   emit();
   return id;
@@ -717,6 +782,7 @@ export function renameRoadmap(id, name) {
     roadmap.id === id ? { ...roadmap, name: trimmed } : roadmap
   );
   saveWorkspacesLocal();
+  markDirty(id);
   schedulePush();
   emit();
   return true;
